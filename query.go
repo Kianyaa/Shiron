@@ -115,6 +115,14 @@ func runQueryCLI(addr string) error {
 		return fmt.Errorf("info query failed: %w", err)
 	}
 	fmt.Printf("Name:    %s\nMap:     %s\nPlayers: %d/%d (%d bots)\n", st.Name, st.Map, st.Humans(), st.Max, st.Bots)
+	if cfg.MapImages = envOr("SHIRON_MAP_IMAGES", defaultMapImages); cfg.MapImages == "none" {
+		cfg.MapImages = ""
+	}
+	if img := mapImage(st.Map); img != "" {
+		fmt.Println("Picture:", img)
+	} else {
+		fmt.Println("Picture: none found")
+	}
 	players, err := queryPlayers(addr)
 	if err != nil {
 		fmt.Println("Player list: query failed:", err)

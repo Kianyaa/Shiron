@@ -47,6 +47,26 @@ func TestMapImage(t *testing.T) {
 	}
 }
 
+func TestWorkshopParsing(t *testing.T) {
+	html := `<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=111&searchtext=x">
+		<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=222"><a href="...filedetails/?id=111">`
+	if ids := workshopIDs(html); len(ids) != 2 || ids[0] != "111" || ids[1] != "222" {
+		t.Fatalf("workshopIDs = %v", ids)
+	}
+	items := []workshopItem{
+		{Title: "ze_ancient_wrath_p (old)", AppID: 730, PreviewURL: "https://img/a"},
+		{Title: "ze_ancient_wrath_p", AppID: 4000, PreviewURL: "https://img/gmod"},
+		{Title: "ze_ancient_wrath_p", AppID: 730, PreviewURL: "http://img/insecure"},
+		{Title: " ZE_Ancient_Wrath_P ", AppID: 730, PreviewURL: "https://img/right"},
+	}
+	if got := pickPreview(items, "ze_ancient_wrath_p"); got != "https://img/right" {
+		t.Fatalf("pickPreview = %q", got)
+	}
+	if got := pickPreview(items, "de_dust2"); got != "" {
+		t.Fatalf("no match should give none, got %q", got)
+	}
+}
+
 func TestOnCooldown(t *testing.T) {
 	if onCooldown("cooldown-user") {
 		t.Fatal("first lookup should be allowed")

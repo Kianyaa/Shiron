@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"net/http"
 	"path"
 	"strconv"
 	"strings"
@@ -569,40 +568,6 @@ func code(s string) string {
 
 // Display is a server label that is safe to put in a message.
 func (s Server) Display() string { return code(s.Label()) }
-
-var (
-	imageCache sync.Map // map name -> picture URL, or "" when there is none
-	httpClient = &http.Client{Timeout: 3 * time.Second}
-)
-
-// mapImage returns a picture URL for a map, or "" if there isn't one. Only plain map
-// names are looked up, so a server can't make us fetch arbitrary paths.
-func mapImage(mapName string) string {
-	if cfg.MapImages == "" {
-		return ""
-	}
-	name := path.Base(strings.ToLower(mapName)) // workshop maps can look like "workshop/123/ze_x"
-	for _, r := range name {
-		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
-			return ""
-		}
-	}
-	if v, ok := imageCache.Load(name); ok {
-		return v.(string)
-	}
-	url := fmt.Sprintf(cfg.MapImages, name)
-	resp, err := httpClient.Head(url)
-	if err != nil {
-		return "" // network hiccup: not cached, so we try again next time
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		url = ""
-	}
-	// shortcut: results are cached until restart; restart to pick up newly published pictures.
-	imageCache.Store(name, url)
-	return url
-}
 
 const queryCooldown = 5 * time.Second
 
