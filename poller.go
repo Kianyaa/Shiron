@@ -31,7 +31,15 @@ func runPoller(ctx context.Context, s *discordgo.Session, every time.Duration) {
 	}
 }
 
+// guard logs a panic instead of letting it crash the bot. Use as `defer guard("what")`.
+func guard(what string) {
+	if r := recover(); r != nil {
+		slog.Error("recovered from panic", "in", what, "err", r)
+	}
+}
+
 func pollOnce(s *discordgo.Session) {
+	defer guard("poll")
 	servers, err := db.Servers("")
 	if err != nil {
 		slog.Error("poll: list servers", "err", err)
@@ -50,6 +58,7 @@ func pollOnce(s *discordgo.Session) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer guard("query " + addr)
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			if st, err := queryInfo(addr); err == nil {
@@ -91,10 +100,14 @@ func guildLocale(s *discordgo.Session, guildID string) string {
 func announce(s *discordgo.Session, sv Server, st *Status) {
 	loc := guildLocale(s, sv.GuildID)
 	embed := statusEmbed(loc, sv.Address, st)
-	embed.Title, embed.Description = T(loc, "post.title", st.Map), st.Name
+	// Title and author are plain text in Discord, so the server-chosen name can't add links.
+	embed.Title = truncate(T(loc, "post.title", st.Map), 256)
+	embed.Author = &discordgo.MessageEmbedAuthor{Name: truncate(st.Name, 256)}
+	msg := &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{embed}, Components: joinButton(loc, sv.Address),
+		AllowedMentions: &discordgo.MessageAllowedMentions{}}
 
 	if st.Humans() >= sv.MinPlayers {
-		if _, err := s.ChannelMessageSendEmbed(sv.ChannelID, embed); err != nil {
+		if _, err := s.ChannelMessageSendComplex(sv.ChannelID, msg); err != nil {
 			slog.Warn("post map change", "guild", sv.GuildID, "channel", sv.ChannelID, "err", err)
 		}
 	}
@@ -117,7 +130,7 @@ func announce(s *discordgo.Session, sv Server, st *Status) {
 		}
 		ch, err := s.UserChannelCreate(n.UserID)
 		if err == nil {
-			_, err = s.ChannelMessageSendEmbed(ch.ID, embed)
+			_, err = s.ChannelMessageSendComplex(ch.ID, msg)
 		}
 		if err != nil {
 			slog.Info("DM failed (user may have DMs off)", "user", n.UserID, "err", err)
@@ -130,9 +143,9 @@ func announce(s *discordgo.Session, sv Server, st *Status) {
 		for _, id := range batch {
 			b.WriteString("<@" + id + "> ")
 		}
-		b.WriteString(T(loc, "notify.channel", st.Map, st.Name))
+		b.WriteString(T(loc, "notify.channel", code(st.Map), code(st.Name)))
 		_, err := s.ChannelMessageSendComplex(sv.ChannelID, &discordgo.MessageSend{Content: b.String(),
-			AllowedMentions: &discordgo.MessageAllowedMentions{Users: batch}})
+			Components: joinButton(loc, sv.Address), AllowedMentions: &discordgo.MessageAllowedMentions{Users: batch}})
 		if err != nil {
 			slog.Warn("post notify mentions", "channel", sv.ChannelID, "err", err)
 		}

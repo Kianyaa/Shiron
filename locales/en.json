@@ -39,16 +39,18 @@
   "err.already_tracked": "%s is already tracked here.",
   "err.bad_pattern": "That map name isn't valid. Example: `de_dust2` or `de_*`.",
   "err.too_many_notifies": "You can have at most %d map alerts per Discord server.",
-  "err.already_notify": "You already have an alert for `%s` on that server.",
+  "err.already_notify": "You already have an alert for %s on that server.",
   "err.notify_not_found": "That alert doesn't exist. Pick one from the list.",
+  "err.cooldown": "Please wait %d seconds between server lookups.",
+  "button.join": "Join server",
 
   "ping.reply": "🏓 Pong! Gateway latency: %d ms",
   "help.text": "**Shiron** tracks CS2 servers.\n\n**Everyone**\n`/map` – current map and players\n`/players` – who is playing\n`/notify add` – get alerted when a map comes up\n`/notify list`, `/notify remove`, `/notify mode` – manage your alerts\n`/invite` – add Shiron to your server\n\n**Admins (Manage Server)**\n`/servers add` – track a CS2 server and post map changes\n`/servers list`, `/servers remove`\n`/servers min-players` – only post when enough players are on",
   "invite.reply": "Add Shiron to your Discord server: %s",
 
-  "servers.added": "Now tracking **%s** (`%s`). Map changes go to <#%s> (minimum players: %d).",
+  "servers.added": "Now tracking %s. Map changes go to <#%s> (minimum players: %d).",
   "servers.list_title": "Tracked CS2 servers",
-  "servers.list_line": "Channel: <#%s> · Min players: %d · Map: `%s`",
+  "servers.list_line": "Channel: <#%s> · Min players: %d · Map: %s",
   "servers.removed": "Stopped tracking %s.",
   "servers.min_set": "%s: map changes are now posted when at least %d players are on.",
 
@@ -60,10 +62,10 @@
   "players.empty": "Nobody is playing right now.",
 
   "post.title": "🗺️ Map changed: %s",
-  "notify.added": "I'll alert you when `%s` comes up on %s (by %s).",
+  "notify.added": "I'll alert you when %s comes up on %s (by %s).",
   "notify.removed": "Alert removed.",
   "notify.none": "You have no map alerts here. Alerts are delivered by %s.",
   "notify.list": "Your map alerts (delivered by %s):",
   "notify.mode_set": "Alerts will now be delivered by %s.",
-  "notify.channel": "🔔 `%s` is now on **%s**!"
+  "notify.channel": "🔔 %s is now on %s!"
 }

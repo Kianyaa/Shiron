@@ -39,16 +39,18 @@
   "err.already_tracked": "%s 已在追踪中。",
   "err.bad_pattern": "地图名无效。示例：`de_dust2` 或 `de_*`。",
   "err.too_many_notifies": "每个 Discord 服务器最多 %d 个地图提醒。",
-  "err.already_notify": "你已在该服务器上设置了 `%s` 的提醒。",
+  "err.already_notify": "你已在该服务器上设置了 %s 的提醒。",
   "err.notify_not_found": "该提醒不存在，请从列表中选择。",
+  "err.cooldown": "请等待 %d 秒后再查询服务器。",
+  "button.join": "加入服务器",
 
   "ping.reply": "🏓 Pong！网关延迟：%d 毫秒",
   "help.text": "**Shiron** 追踪 CS2 服务器。\n\n**所有人**\n`/map` – 当前地图和玩家\n`/players` – 谁在玩\n`/notify add` – 地图上线时提醒\n`/notify list`、`/notify remove`、`/notify mode` – 管理提醒\n`/invite` – 将 Shiron 添加到你的服务器\n\n**管理员（管理服务器）**\n`/servers add` – 追踪 CS2 服务器并发布换图消息\n`/servers list`、`/servers remove`\n`/servers min-players` – 玩家足够时才发布",
   "invite.reply": "将 Shiron 添加到你的 Discord 服务器：%s",
 
-  "servers.added": "开始追踪 **%s**（`%s`）。换图消息将发布到 <#%s>（最少玩家：%d）。",
+  "servers.added": "开始追踪 %s。换图消息将发布到 <#%s>（最少玩家：%d）。",
   "servers.list_title": "追踪的 CS2 服务器",
-  "servers.list_line": "频道：<#%s> · 最少玩家：%d · 地图：`%s`",
+  "servers.list_line": "频道：<#%s> · 最少玩家：%d · 地图：%s",
   "servers.removed": "已停止追踪 %s。",
   "servers.min_set": "%s：玩家不少于 %d 人时才发布换图消息。",
 
@@ -60,10 +62,10 @@
   "players.empty": "现在没有人在玩。",
 
   "post.title": "🗺️ 换图：%s",
-  "notify.added": "`%s` 在 %s 上线时我会通过%s提醒你。",
+  "notify.added": "%s 在 %s 上线时我会通过%s提醒你。",
   "notify.removed": "提醒已删除。",
   "notify.none": "你在这里没有地图提醒。提醒将通过%s发送。",
   "notify.list": "你的地图提醒（通过%s发送）：",
   "notify.mode_set": "提醒将通过%s发送。",
-  "notify.channel": "🔔 `%s` 已在 **%s** 上线！"
+  "notify.channel": "🔔 %s 已在 %s 上线！"
 }

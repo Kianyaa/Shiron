@@ -1,9 +1,100 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestCode(t *testing.T) {
+	cases := map[string]string{
+		"de_dust2":                          "`de_dust2`",
+		"[Free skins](http://scam.example)": "`[Free skins](http://scam.example)`",
+		"evil` @everyone **x**":             "`evil' @everyone **x**`",
+		"two\nlines":                        "`two lines`",
+		"  ":                                "`-`",
+	}
+	for in, want := range cases {
+		if got := code(in); got != want {
+			t.Errorf("code(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if n := len([]rune(code(strings.Repeat("a", 500)))); n != 102 {
+		t.Errorf("code should cap at 100 chars + backticks, got %d", n)
+	}
+}
+
+func TestMapImage(t *testing.T) {
+	old := cfg
+	defer func() { cfg = old }()
+	cfg.MapImages = ""
+	if mapImage("de_dust2") != "" {
+		t.Error("pictures off should give no URL")
+	}
+	cfg.MapImages = "https://img.example/%s.png"
+	imageCache.Store("de_dust2", "https://img.example/de_dust2.png") // no network in tests
+	if got := mapImage("DE_Dust2"); got != "https://img.example/de_dust2.png" {
+		t.Errorf("mapImage = %q", got)
+	}
+	if got := mapImage("workshop/123/de_dust2"); got != "https://img.example/de_dust2.png" {
+		t.Errorf("workshop map = %q", got)
+	}
+	for _, bad := range []string{"de_dust2?x=1", "a b", "map%2f", "", "de.dust"} {
+		if got := mapImage(bad); got != "" {
+			t.Errorf("mapImage(%q) = %q, want none", bad, got)
+		}
+	}
+}
+
+func TestOnCooldown(t *testing.T) {
+	if onCooldown("cooldown-user") {
+		t.Fatal("first lookup should be allowed")
+	}
+	if !onCooldown("cooldown-user") {
+		t.Fatal("second lookup right away should be blocked")
+	}
+	if onCooldown("other-user") {
+		t.Fatal("cooldown is per user")
+	}
+}
+
+func TestLoadConfig(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "token.txt")
+	os.WriteFile(file, []byte("  secret-token\n"), 0o600)
+	t.Setenv("SHIRON_TOKEN", "")
+	t.Setenv("SHIRON_TOKEN_FILE", file)
+	c, err := loadConfig()
+	if err != nil || c.Token != "secret-token" {
+		t.Fatalf("token file: %q, %v", c.Token, err)
+	}
+	if c.MapImages != defaultMapImages || c.ConnectURL != "" {
+		t.Fatalf("defaults: %+v", c)
+	}
+
+	t.Setenv("SHIRON_TOKEN_FILE", filepath.Join(dir, "missing.txt"))
+	if _, err := loadConfig(); err == nil {
+		t.Fatal("missing token file should fail")
+	}
+
+	t.Setenv("SHIRON_TOKEN", "env-token")
+	for env, bad := range map[string]string{
+		"SHIRON_CONNECT_URL": "http://not-https.example/connect.html",
+		"SHIRON_MAP_IMAGES":  "https://img.example/no-placeholder.png",
+		"SHIRON_POLL":        "1s",
+	} {
+		t.Setenv(env, bad)
+		if _, err := loadConfig(); err == nil {
+			t.Errorf("%s=%q should be rejected", env, bad)
+		}
+		t.Setenv(env, "")
+	}
+	t.Setenv("SHIRON_MAP_IMAGES", "none")
+	if c, err := loadConfig(); err != nil || c.MapImages != "" || c.Token != "env-token" {
+		t.Fatalf("none/env token: %+v, %v", c, err)
+	}
+}
 
 func TestLocalesComplete(t *testing.T) {
 	for key, en := range locales["en"] {
@@ -119,7 +210,8 @@ func TestResolveAddr(t *testing.T) {
 		}
 	}
 	for _, in := range []string{"127.0.0.1", "10.0.0.5:27015", "192.168.1.10", "172.16.0.1", "100.64.1.1",
-		"169.254.169.254", "0.0.0.0", "::1", "[::1]:27015", "1.1.1.1:0", "1.1.1.1:99999", "1.1.1.1:abc", ""} {
+		"169.254.169.254", "0.0.0.0", "0.1.2.3", "198.18.0.1", "240.0.0.1", "255.255.255.255", "[::ffff:127.0.0.1]:27015",
+		"::1", "[::1]:27015", "1.1.1.1:0", "1.1.1.1:99999", "1.1.1.1:abc", ""} {
 		if got, err := resolveAddr(in); err == nil {
 			t.Errorf("resolveAddr(%q) = %q, want error", in, got)
 		}

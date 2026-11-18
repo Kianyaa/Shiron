@@ -78,11 +78,31 @@ func resolveAddr(input string) (string, error) {
 	return net.JoinHostPort(ip.String(), port), nil
 }
 
-var cgnat = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
+// reserved holds ranges the standard library helpers don't cover.
+var reserved = func() (nets []*net.IPNet) {
+	for _, cidr := range []string{
+		"0.0.0.0/8",     // "this network"
+		"100.64.0.0/10", // carrier-grade NAT
+		"198.18.0.0/15", // benchmarking
+		"240.0.0.0/4",   // reserved, includes broadcast
+	} {
+		_, n, _ := net.ParseCIDR(cidr)
+		nets = append(nets, n)
+	}
+	return
+}()
 
 func isPublicIP(ip net.IP) bool {
-	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsMulticast() ||
-		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsInterfaceLocalMulticast() || cgnat.Contains(ip))
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsMulticast() ||
+		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsInterfaceLocalMulticast() {
+		return false
+	}
+	for _, n := range reserved {
+		if n.Contains(ip) {
+			return false
+		}
+	}
+	return true
 }
 
 // runQueryCLI is `shiron query <ip:port>`: checks a CS2 server without Discord.

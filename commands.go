@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -168,10 +170,13 @@ func (c *ictx) deferReply(ephemeral bool) {
 	}
 }
 
-func (c *ictx) edit(text string, embed *discordgo.MessageEmbed) {
+func (c *ictx) edit(text string, embed *discordgo.MessageEmbed, comps ...discordgo.MessageComponent) {
 	e := &discordgo.WebhookEdit{Content: &text, AllowedMentions: &discordgo.MessageAllowedMentions{}}
 	if embed != nil {
 		e.Embeds = &[]*discordgo.MessageEmbed{embed}
+	}
+	if len(comps) > 0 {
+		e.Components = &comps
 	}
 	if _, err := c.s.InteractionResponseEdit(c.i.Interaction, e); err != nil {
 		slog.Warn("edit failed", "err", err)
@@ -215,11 +220,7 @@ var handlers = map[string]func(*ictx){
 var anywhereCmds = map[string]bool{"ping": true, "help": true, "invite": true}
 
 func onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("handler panic", "err", r)
-		}
-	}()
+	defer guard("interaction")
 	switch i.Type {
 	case discordgo.InteractionApplicationCommand:
 		c, name := newCtx(s, i)
@@ -278,18 +279,19 @@ func cmdServersAdd(c *ictx) {
 	c.deferReply(true)
 	st, err := queryInfo(addr)
 	if err != nil {
-		c.edit("❌ "+c.t("err.no_response", addr), nil)
+		c.edit("❌ "+c.t("err.no_response", code(addr)), nil)
 		return
 	}
-	_, err = db.AddServer(Server{GuildID: c.guild(), ChannelID: channelID, Address: addr, MinPlayers: minP, LastMap: st.Map, Name: st.Name})
+	sv := Server{GuildID: c.guild(), ChannelID: channelID, Address: addr, MinPlayers: minP, LastMap: st.Map, Name: st.Name}
+	_, err = db.AddServer(sv)
 	switch {
 	case isUnique(err):
-		c.edit("❌ "+c.t("err.already_tracked", addr), nil)
+		c.edit("❌ "+c.t("err.already_tracked", code(addr)), nil)
 	case err != nil:
 		slog.Error("add server", "err", err)
 		c.edit("❌ "+c.t("err.internal"), nil)
 	default:
-		c.edit("✅ "+c.t("servers.added", st.Name, addr, channelID, minP), nil)
+		c.edit("✅ "+c.t("servers.added", sv.Display(), channelID, minP), nil)
 	}
 }
 
@@ -305,7 +307,7 @@ func cmdServersList(c *ictx) {
 	}
 	var b strings.Builder
 	for _, s := range list {
-		fmt.Fprintf(&b, "%s\n%s\n\n", s.Label(), c.t("servers.list_line", s.ChannelID, s.MinPlayers, orDash(s.LastMap)))
+		fmt.Fprintf(&b, "%s\n%s\n\n", s.Display(), c.t("servers.list_line", s.ChannelID, s.MinPlayers, code(s.LastMap)))
 	}
 	c.respond(&discordgo.InteractionResponseData{Embeds: []*discordgo.MessageEmbed{{
 		Title: c.t("servers.list_title"), Description: truncate(b.String(), 4000), Color: colorShiron}}}, true)
@@ -321,7 +323,7 @@ func cmdServersRemove(c *ictx) {
 		c.fail("err.internal")
 		return
 	}
-	c.ok("servers.removed", sv.Label())
+	c.ok("servers.removed", sv.Display())
 }
 
 func cmdServersMinPlayers(c *ictx) {
@@ -335,17 +337,34 @@ func cmdServersMinPlayers(c *ictx) {
 		c.fail("err.internal")
 		return
 	}
-	c.ok("servers.min_set", sv.Label(), v)
+	c.ok("servers.min_set", sv.Display(), v)
 }
 
 // ---------- /map and /players ----------
 
+// statusEmbed shows a server's live state. The server name goes in the title, which
+// Discord shows as plain text, so a name can't smuggle in links or formatting.
 func statusEmbed(loc, addr string, st *Status) *discordgo.MessageEmbed {
-	return &discordgo.MessageEmbed{Title: st.Name, Color: colorShiron, Fields: []*discordgo.MessageEmbedField{
-		{Name: T(loc, "field.map"), Value: "`" + st.Map + "`", Inline: true},
+	e := &discordgo.MessageEmbed{Title: truncate(st.Name, 256), Color: colorShiron, Fields: []*discordgo.MessageEmbedField{
+		{Name: T(loc, "field.map"), Value: code(st.Map), Inline: true},
 		{Name: T(loc, "field.players"), Value: T(loc, "players.count", st.Humans(), st.Max, st.Bots), Inline: true},
-		{Name: T(loc, "field.connect"), Value: "`connect " + addr + "`"},
+		{Name: T(loc, "field.connect"), Value: code("connect " + addr)},
 	}}
+	if img := mapImage(st.Map); img != "" {
+		e.Image = &discordgo.MessageEmbedImage{URL: img}
+	}
+	return e
+}
+
+// joinButton is a link button that opens CS2 and joins the server, via the
+// https page in SHIRON_CONNECT_URL (Discord only allows http(s) links on buttons).
+func joinButton(loc, addr string) []discordgo.MessageComponent {
+	if cfg.ConnectURL == "" {
+		return nil
+	}
+	return []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+		discordgo.Button{Label: T(loc, "button.join"), Style: discordgo.LinkButton, URL: cfg.ConnectURL + "#" + addr},
+	}}}
 }
 
 func cmdMap(c *ictx) {
@@ -354,13 +373,17 @@ func cmdMap(c *ictx) {
 		c.fail(errKey)
 		return
 	}
+	if onCooldown(c.user()) {
+		c.fail("err.cooldown", int(queryCooldown.Seconds()))
+		return
+	}
 	c.deferReply(false)
 	st, err := queryInfo(sv.Address)
 	if err != nil {
-		c.edit("❌ "+c.t("err.no_response", sv.Label()), nil)
+		c.edit("❌ "+c.t("err.no_response", sv.Display()), nil)
 		return
 	}
-	c.edit("", statusEmbed(c.loc, sv.Address, st))
+	c.edit("", statusEmbed(c.loc, sv.Address, st), joinButton(c.loc, sv.Address)...)
 }
 
 func cmdPlayers(c *ictx) {
@@ -369,31 +392,36 @@ func cmdPlayers(c *ictx) {
 		c.fail(errKey)
 		return
 	}
+	if onCooldown(c.user()) {
+		c.fail("err.cooldown", int(queryCooldown.Seconds()))
+		return
+	}
 	c.deferReply(false)
 	st, err := queryInfo(sv.Address)
 	if err != nil {
-		c.edit("❌ "+c.t("err.no_response", sv.Label()), nil)
+		c.edit("❌ "+c.t("err.no_response", sv.Display()), nil)
 		return
 	}
 	e := statusEmbed(c.loc, sv.Address, st)
 	players, err := queryPlayers(sv.Address)
+	// A code block: player names are chosen by players, so nothing in them may render.
 	var b strings.Builder
 	for _, p := range players {
 		if p.Name == "" {
 			continue // connecting players have no name yet
 		}
-		fmt.Fprintf(&b, "%s — %d · %s\n", escapeMarkdown.Replace(p.Name), p.Score, (time.Duration(p.Duration) * time.Second).String())
+		name := truncate(strings.ReplaceAll(p.Name, "`", "'"), 24)
+		fmt.Fprintf(&b, "%-24s %5d  %s\n", name, p.Score, (time.Duration(p.Duration) * time.Second).Truncate(time.Minute))
 	}
-	if err != nil || b.Len() == 0 {
-		if st.Humans() > 0 {
-			e.Description = c.t("players.hidden")
-		} else {
-			e.Description = c.t("players.empty")
-		}
-	} else {
-		e.Description = truncate(b.String(), 4000)
+	switch {
+	case err == nil && b.Len() > 0:
+		e.Description = "```\n" + truncate(b.String(), 3900) + "```"
+	case st.Humans() > 0:
+		e.Description = c.t("players.hidden")
+	default:
+		e.Description = c.t("players.empty")
 	}
-	c.edit("", e)
+	c.edit("", e, joinButton(c.loc, sv.Address)...)
 }
 
 // ---------- /notify ----------
@@ -426,11 +454,11 @@ func cmdNotifyAdd(c *ictx) {
 	}
 	switch err := db.AddNotify(c.user(), sv.ID, pattern); {
 	case isUnique(err):
-		c.fail("err.already_notify", pattern)
+		c.fail("err.already_notify", code(pattern))
 	case err != nil:
 		c.fail("err.internal")
 	default:
-		c.ok("notify.added", pattern, sv.Label(), c.t("mode."+db.Delivery(c.user())))
+		c.ok("notify.added", code(pattern), sv.Display(), c.t("mode."+db.Delivery(c.user())))
 	}
 }
 
@@ -460,7 +488,7 @@ func cmdNotifyList(c *ictx) {
 	}
 	var b strings.Builder
 	for _, n := range list {
-		fmt.Fprintf(&b, "`%s` — %s\n", n.Pattern, n.Server.Label())
+		fmt.Fprintf(&b, "%s — %s\n", code(n.Pattern), n.Server.Display())
 	}
 	c.reply(truncate(c.t("notify.list", mode)+"\n"+b.String(), 2000))
 }
@@ -528,12 +556,72 @@ func truncate(s string, n int) string {
 	return string(r[:n-1]) + "…"
 }
 
-// escapeMarkdown stops player names like "**x**" from breaking the list's formatting.
-var escapeMarkdown = strings.NewReplacer(`\`, `\\`, "*", `\*`, "_", `\_`, "`", "\\`", "~", `\~`, "|", `\|`, ">", `\>`)
-
-func orDash(s string) string {
+// code shows untrusted text (server names, map names) as inline code, where Discord
+// renders no links, mentions or formatting. Backticks and newlines are removed so it
+// can't break out.
+func code(s string) string {
+	s = strings.NewReplacer("`", "'", "\n", " ", "\r", " ").Replace(strings.TrimSpace(s))
 	if s == "" {
-		return "-"
+		s = "-"
 	}
-	return s
+	return "`" + truncate(s, 100) + "`"
+}
+
+// Display is a server label that is safe to put in a message.
+func (s Server) Display() string { return code(s.Label()) }
+
+var (
+	imageCache sync.Map // map name -> picture URL, or "" when there is none
+	httpClient = &http.Client{Timeout: 3 * time.Second}
+)
+
+// mapImage returns a picture URL for a map, or "" if there isn't one. Only plain map
+// names are looked up, so a server can't make us fetch arbitrary paths.
+func mapImage(mapName string) string {
+	if cfg.MapImages == "" {
+		return ""
+	}
+	name := path.Base(strings.ToLower(mapName)) // workshop maps can look like "workshop/123/ze_x"
+	for _, r := range name {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
+			return ""
+		}
+	}
+	if v, ok := imageCache.Load(name); ok {
+		return v.(string)
+	}
+	url := fmt.Sprintf(cfg.MapImages, name)
+	resp, err := httpClient.Head(url)
+	if err != nil {
+		return "" // network hiccup: not cached, so we try again next time
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		url = ""
+	}
+	// shortcut: results are cached until restart; restart to pick up newly published pictures.
+	imageCache.Store(name, url)
+	return url
+}
+
+const queryCooldown = 5 * time.Second
+
+var (
+	cooldownMu sync.Mutex
+	lastQuery  = map[string]time.Time{}
+)
+
+// onCooldown limits /map and /players to one per user every few seconds, so nobody
+// can use Shiron to flood a game server with queries.
+func onCooldown(user string) bool {
+	cooldownMu.Lock()
+	defer cooldownMu.Unlock()
+	if time.Since(lastQuery[user]) < queryCooldown {
+		return true
+	}
+	if len(lastQuery) > 10000 {
+		clear(lastQuery) // keep memory bounded; losing old timestamps is harmless
+	}
+	lastQuery[user] = time.Now()
+	return false
 }

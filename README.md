@@ -2,8 +2,8 @@
 
 A small, fast Discord bot that tracks **CS2 servers**. One program file, no database server, speaks English, Thai and Simplified Chinese.
 
-- Posts a message in a channel when a tracked server changes map, with an optional minimum player count.
-- `/map` and `/players` show live server info.
+- Posts a message in a channel when a tracked server changes map, with a picture of the map and an optional minimum player count.
+- `/map` and `/players` show live server info, with a **Join server** button that opens CS2 and connects.
 - `/notify` alerts users (by DM or a channel mention, their choice) when a map they want comes up. Wildcards like `de_*` work.
 
 ## Commands
@@ -30,23 +30,38 @@ The invite link is printed when the bot starts, and `/invite` shows it too.
 
 Needs Go 1.27+ (only to build).
 
+Put the bot token in a file named `token.txt` next to the program (it is git-ignored), then:
+
 ```bash
 go build -o shiron .
-SHIRON_TOKEN=your-token ./shiron
+./shiron
 ```
 
-On Windows PowerShell:
+On Windows: `go build -o shiron.exe .` then `.\shiron.exe`.
 
-```powershell
-go build -o shiron.exe .
-$env:SHIRON_TOKEN = "your-token"; .\shiron.exe
-```
+Don't type the token on the command line (`$env:SHIRON_TOKEN = "..."`): shells save that in their history file.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SHIRON_TOKEN` | (required) | Bot token |
+| `SHIRON_TOKEN_FILE` | `token.txt` | File holding the bot token |
+| `SHIRON_TOKEN` | | The token itself (overrides the file; avoid on shared machines) |
 | `SHIRON_DB` | `shiron.db` | SQLite file path |
 | `SHIRON_POLL` | `60s` | How often to check servers (minimum `10s`) |
+| `SHIRON_CONNECT_URL` | (off) | Page for the **Join server** button, see below |
+| `SHIRON_MAP_IMAGES` | ghostcap-gaming/cs2-map-images | Map picture URL with one `%s` for the map name, or `none` |
+
+### Join server button
+
+Discord buttons can only open `https://` links, not `steam://connect`. So Shiron links to a tiny page, [docs/connect.html](docs/connect.html), which opens Steam and joins the server.
+
+1. Push this repo to GitHub, then go to **Settings → Pages**. Set the source to the `main` branch and the `/docs` folder.
+2. Set `SHIRON_CONNECT_URL=https://<your-github-name>.github.io/<repo-name>/connect.html`.
+
+Without it, Shiron still shows the `connect IP:port` console command.
+
+### Map pictures
+
+By default, pictures come from the community [cs2-map-images](https://github.com/ghostcap-gaming/cs2-map-images) collection. Official maps like `de_dust2` are covered. Custom maps (ZE, surf and similar) usually aren't, so those posts have no picture. To use your own pictures, host PNGs named after the map and point `SHIRON_MAP_IMAGES` at them, e.g. `https://example.com/maps/%s.png`.
 
 Check a CS2 server without Discord:
 
@@ -63,7 +78,15 @@ GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o shiron-linux-
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o shiron-linux-amd64 .   # most VPS
 ```
 
-Copy the file to the server and run it with systemd (`/etc/systemd/system/shiron.service`):
+Copy the file to `/opt/shiron/` on the server. Create a `shiron` user that owns that folder, and save the token so only that user can read it:
+
+```bash
+sudo useradd --system --home /opt/shiron shiron
+sudo chown -R shiron: /opt/shiron
+sudo -u shiron sh -c 'umask 077; cat > /opt/shiron/token.txt'   # paste the token, then Ctrl+D
+```
+
+Run it with systemd (`/etc/systemd/system/shiron.service`). The token stays out of this file, which every user can read:
 
 ```ini
 [Unit]
@@ -73,7 +96,6 @@ After=network-online.target
 [Service]
 ExecStart=/opt/shiron/shiron
 WorkingDirectory=/opt/shiron
-Environment=SHIRON_TOKEN=your-token
 Restart=always
 User=shiron
 
@@ -85,11 +107,13 @@ WantedBy=multi-user.target
 sudo systemctl enable --now shiron
 ```
 
-Or with Docker:
+Or with Docker. The token file is mounted read-only rather than passed with `-e`, which `docker inspect` would show. The container runs as user 65532, so give that user the file:
 
 ```bash
+sudo chown 65532 /opt/shiron/token.txt
 docker build -t shiron .
-docker run -d --restart=always -e SHIRON_TOKEN=your-token -v shiron-data:/data shiron
+docker run -d --restart=always -v shiron-data:/data \
+  -v /opt/shiron/token.txt:/run/token:ro -e SHIRON_TOKEN_FILE=/run/token shiron
 ```
 
 Only outbound internet access is needed; no ports have to be opened. Back up `shiron.db` to keep your settings.

@@ -34,8 +34,8 @@ func main() {
 }
 
 func run() error {
-	cfg, err := loadConfig()
-	if err != nil {
+	var err error
+	if cfg, err = loadConfig(); err != nil {
 		return err
 	}
 	if db, err = openDB(cfg.DB); err != nil {
