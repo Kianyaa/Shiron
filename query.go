@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rumblefrog/go-a2s"
@@ -16,10 +17,22 @@ const queryTimeout = 3 * time.Second
 type Status struct {
 	Name, Map          string
 	Players, Bots, Max int
+	AppID              int // Steam game: 730 is Counter-Strike 2
 }
+
+const cs2AppID = 730
+
+// IsCS2 reports whether the server runs Counter-Strike 2 (checked live: CS2 servers
+// report 730, CS 1.6 reports 80, HL2DM 320).
+func (s *Status) IsCS2() bool { return s.AppID == cs2AppID }
 
 // Humans is the player count without bots (A2S counts bots as players).
 func (s *Status) Humans() int { return max(s.Players-s.Bots, 0) }
+
+// lastSeen maps address -> time.Time of the server's last answer, and lastStatus
+// address -> *Status from it, so loading cards and /servers list can show recent data
+// without asking every server again. Commands and the poller both write them.
+var lastSeen, lastStatus sync.Map
 
 func queryInfo(addr string) (*Status, error) {
 	c, err := a2s.NewClient(addr, a2s.TimeoutOption(queryTimeout))
@@ -31,7 +44,10 @@ func queryInfo(addr string) (*Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Status{Name: info.Name, Map: info.Map, Players: int(info.Players), Bots: int(info.Bots), Max: int(info.MaxPlayers)}, nil
+	st := &Status{Name: info.Name, Map: info.Map, Players: int(info.Players), Bots: int(info.Bots), Max: int(info.MaxPlayers), AppID: int(info.ID)}
+	lastSeen.Store(addr, time.Now())
+	lastStatus.Store(addr, st)
+	return st, nil
 }
 
 func queryPlayers(addr string) ([]*a2s.Player, error) {
@@ -85,6 +101,8 @@ var reserved = func() (nets []*net.IPNet) {
 		"100.64.0.0/10", // carrier-grade NAT
 		"198.18.0.0/15", // benchmarking
 		"240.0.0.0/4",   // reserved, includes broadcast
+		"64:ff9b::/96",  // IPv6 -> IPv4 translation (NAT64): could reach private IPv4
+		"64:ff9b:1::/48",
 	} {
 		_, n, _ := net.ParseCIDR(cidr)
 		nets = append(nets, n)

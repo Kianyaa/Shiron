@@ -10,11 +10,17 @@ A small, fast Discord bot that tracks **CS2 servers**. One program file, no data
 
 | Command | Who |
 |---|---|
-| `/servers add address [channel] [min_players]` | Manage Server |
-| `/servers list`, `/servers remove`, `/servers min-players` | Manage Server |
+| `/servers add ip [channel] [min_players] [style]` | Manage Server |
+| `/servers list` — manage servers (channel, card style, min players, remove), map pictures and Workshop collections | Manage Server |
 | `/map [server]`, `/players [server]` | everyone |
-| `/notify add map [server]`, `/notify remove`, `/notify list`, `/notify mode` | everyone |
+| `/notify add map [server]` — leave out `server` to be alerted on all servers | everyone |
+| `/notify list` — see and remove your alerts, switch DM / channel | everyone |
+| `/about` — version, what's new and stats | everyone |
 | `/ping`, `/help`, `/invite` | everyone |
+
+Releasing an update: add a section like the v1.0 one (heading `v1.1 · YYYY-MM-DD`, then bullet points) above it in [CHANGELOG.md](CHANGELOG.md) and rebuild. `/about` and the startup window read the version from it.
+
+Map cards also have buttons: Join server, Copy IP, Players, Refresh and 🔔 Notify me.
 
 Replies use each user's Discord language. Automatic map posts use the Discord server's language.
 
@@ -37,7 +43,9 @@ go build -o shiron .
 ./shiron
 ```
 
-On Windows: `go build -o shiron.exe .` then `.\shiron.exe`.
+On Windows: `go build -o shiron.exe .`, then double-click `shiron.exe`. A window shows when the bot is online; closing it stops the bot. If something is wrong, the window stays open and says what.
+
+Other settings go in `shiron.conf` next to the program: copy [shiron.conf.example](shiron.conf.example) and edit it. Real environment variables override the file.
 
 Don't type the token on the command line (`$env:SHIRON_TOKEN = "..."`): shells save that in their history file.
 
@@ -125,4 +133,20 @@ Only outbound internet access is needed; no ports have to be opened. Back up `sh
 
 ## License
 
-MIT
+Copyright (C) 2026 Kianyaa
+
+Shiron is free software under the **GNU Affero General Public License v3.0** ([LICENSE](LICENSE)). In short:
+
+- You may use, study, change and share it.
+- If you run a **modified** Shiron for other people (for example, as a public Discord bot), you must make your changed source code available to them under the same license. Running it unmodified needs nothing extra.
+- It comes with no warranty.
+
+The full license text is what counts; this summary is only a guide.
+
+### Name and logo
+
+The license covers the code, not Shiron's identity. The name **Shiron** and its avatar belong to the project. If you run a modified version publicly, give it a different name and avatar, so people don't confuse it with the official bot. Saying "based on Shiron" with a link here is welcome.
+
+### Contributing
+
+By sending changes to this project, you agree they're released under the AGPL v3 and that the maintainer may also offer the project under other license terms.

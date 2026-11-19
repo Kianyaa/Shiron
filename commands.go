@@ -50,36 +50,31 @@ func commandDefs() []*discordgo.ApplicationCommand {
 		o.Autocomplete = true
 		return o
 	}
-	minPlayers := func(required bool) *discordgo.ApplicationCommandOption {
-		o := option(num, "min_players", "opt.min_players", required)
-		o.MinValue, o.MaxValue = ptr(0.0), maxMinPlayers
-		return o
-	}
-	address := option(str, "address", "opt.address", true)
-	address.MaxLength = 100
+	// Only commands that need typed input or open a panel; everything else is a button
+	// in /servers list (admins) or /notify list (everyone).
+	minPlayers := option(num, "min_players", "opt.min_players", false)
+	minPlayers.MinValue, minPlayers.MaxValue = ptr(0.0), maxMinPlayers
+	ip := option(str, "ip", "opt.address", true)
+	ip.MaxLength = 100
 	channel := option(discordgo.ApplicationCommandOptionChannel, "channel", "opt.channel", false)
 	channel.ChannelTypes = []discordgo.ChannelType{discordgo.ChannelTypeGuildText, discordgo.ChannelTypeGuildNews}
 	mapName := option(str, "map", "opt.map", true)
 	mapName.MaxLength = 64
-	notification := option(str, "notification", "opt.notification", true)
-	notification.Autocomplete = true
-	mode := option(str, "mode", "opt.mode", true)
-	mode.Choices = []*discordgo.ApplicationCommandOptionChoice{
-		{Name: "DM", Value: "dm", NameLocalizations: localized("choice.dm")},
-		{Name: "Channel", Value: "channel", NameLocalizations: localized("choice.channel")},
+	style := option(str, "style", "opt.style", false)
+	style.Choices = []*discordgo.ApplicationCommandOptionChoice{
+		{Name: "Full", Value: "full", NameLocalizations: localized("style.full")},
+		{Name: "Compact", Value: "compact", NameLocalizations: localized("style.compact")},
 	}
 
 	servers := command("servers", "cmd.servers",
-		option(sub, "add", "cmd.servers.add", false, address, channel, minPlayers(false)),
+		option(sub, "add", "cmd.servers.add", false, ip, channel, minPlayers, style),
 		option(sub, "list", "cmd.servers.list", false),
-		option(sub, "remove", "cmd.servers.remove", false, server(true)),
-		option(sub, "min-players", "cmd.servers.min_players", false, server(true), minPlayers(true)),
 	)
 	servers.DefaultMemberPermissions = ptr(int64(discordgo.PermissionManageGuild))
 
 	anywhere := &[]discordgo.InteractionContextType{discordgo.InteractionContextGuild, discordgo.InteractionContextBotDM}
-	ping, help, invite := command("ping", "cmd.ping"), command("help", "cmd.help"), command("invite", "cmd.invite")
-	ping.Contexts, help.Contexts, invite.Contexts = anywhere, anywhere, anywhere
+	ping, help, invite, about := command("ping", "cmd.ping"), command("help", "cmd.help"), command("invite", "cmd.invite"), command("about", "cmd.about")
+	ping.Contexts, help.Contexts, invite.Contexts, about.Contexts = anywhere, anywhere, anywhere, anywhere
 
 	return []*discordgo.ApplicationCommand{
 		servers,
@@ -87,11 +82,9 @@ func commandDefs() []*discordgo.ApplicationCommand {
 		command("players", "cmd.players", server(false)),
 		command("notify", "cmd.notify",
 			option(sub, "add", "cmd.notify.add", false, mapName, server(false)),
-			option(sub, "remove", "cmd.notify.remove", false, notification),
 			option(sub, "list", "cmd.notify.list", false),
-			option(sub, "mode", "cmd.notify.mode", false, mode),
 		),
-		ping, help, invite,
+		about, ping, help, invite,
 	}
 }
 
@@ -169,21 +162,16 @@ func (c *ictx) deferReply(ephemeral bool) {
 	}
 }
 
-func (c *ictx) edit(text string, embed *discordgo.MessageEmbed, comps ...discordgo.MessageComponent) {
+func (c *ictx) edit(text string) {
 	e := &discordgo.WebhookEdit{Content: &text, AllowedMentions: &discordgo.MessageAllowedMentions{}}
-	if embed != nil {
-		e.Embeds = &[]*discordgo.MessageEmbed{embed}
-	}
-	if len(comps) > 0 {
-		e.Components = &comps
-	}
 	if _, err := c.s.InteractionResponseEdit(c.i.Interaction, e); err != nil {
 		slog.Warn("edit failed", "err", err)
 	}
 }
 
-// server resolves the "server" option: an autocomplete ID, a typed address, or the
-// only tracked server when the option was left empty. Returns an i18n error key on failure.
+// server resolves the "server" option: an autocomplete ID, a typed address, or, when the
+// option was left empty, the one server this channel (or this Discord server) tracks.
+// Returns an i18n error key on failure.
 func (c *ictx) server() (*Server, string) {
 	list, err := db.Servers(c.guild())
 	if err != nil {
@@ -195,8 +183,8 @@ func (c *ictx) server() (*Server, string) {
 	}
 	raw := c.str("server")
 	if raw == "" {
-		if len(list) == 1 {
-			return &list[0], ""
+		if sv := defaultServer(list, c.i.ChannelID); sv != nil {
+			return sv, ""
 		}
 		return nil, "err.pick_server"
 	}
@@ -208,15 +196,32 @@ func (c *ictx) server() (*Server, string) {
 	return nil, "err.server_not_found"
 }
 
-var handlers = map[string]func(*ictx){
-	"ping": cmdPing, "help": cmdHelp, "invite": cmdInvite,
-	"servers add": cmdServersAdd, "servers list": cmdServersList, "servers remove": cmdServersRemove,
-	"servers min-players": cmdServersMinPlayers,
-	"map":                 cmdMap, "players": cmdPlayers,
-	"notify add": cmdNotifyAdd, "notify remove": cmdNotifyRemove, "notify list": cmdNotifyList, "notify mode": cmdNotifyMode,
+// defaultServer picks the server meant when none was named: the only one tracked in
+// this channel, else the only one in the Discord server. nil means the user must pick.
+func defaultServer(list []Server, channelID string) *Server {
+	var here []*Server
+	for i := range list {
+		if list[i].ChannelID == channelID {
+			here = append(here, &list[i])
+		}
+	}
+	switch {
+	case len(here) == 1:
+		return here[0]
+	case len(list) == 1:
+		return &list[0]
+	}
+	return nil
 }
 
-var anywhereCmds = map[string]bool{"ping": true, "help": true, "invite": true}
+var handlers = map[string]func(*ictx){
+	"ping": cmdPing, "help": cmdHelp, "invite": cmdInvite, "about": cmdAbout,
+	"servers add": cmdServersAdd, "servers list": cmdServersList,
+	"map": cmdMap, "players": cmdPlayers,
+	"notify add": cmdNotifyAdd, "notify list": cmdNotifyList,
+}
+
+var anywhereCmds = map[string]bool{"ping": true, "help": true, "invite": true, "about": true}
 
 func onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	defer guard("interaction")
@@ -231,9 +236,33 @@ func onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			c.fail("err.guild_only")
 			return
 		}
+		// Discord hides /servers from non-admins, but admins can grant it to other roles in
+		// Server Settings > Integrations. Require Manage Server here too, so the command
+		// and its Manage buttons agree on who may change things.
+		if strings.HasPrefix(name, "servers ") && (i.Member == nil || i.Member.Permissions&discordgo.PermissionManageGuild == 0) {
+			c.fail("err.not_admin")
+			return
+		}
 		h(c)
 	case discordgo.InteractionApplicationCommandAutocomplete:
 		onAutocomplete(s, i)
+	case discordgo.InteractionMessageComponent:
+		switch id := i.MessageComponentData().CustomID; {
+		case strings.HasPrefix(id, "srvm:"):
+			onManage(s, i)
+		case strings.HasPrefix(id, "ntf:"):
+			onAlertList(s, i)
+		case strings.HasPrefix(id, "about:"):
+			onAbout(s, i)
+		default:
+			onButton(s, i)
+		}
+	case discordgo.InteractionModalSubmit:
+		if strings.HasPrefix(i.ModalSubmitData().CustomID, "ntf:") {
+			onAlertList(s, i)
+		} else {
+			onManage(s, i)
+		}
 	}
 }
 
@@ -260,7 +289,7 @@ func cmdServersAdd(c *ictx) {
 		c.fail("err.too_many_servers", maxServersPerGuild)
 		return
 	}
-	addr, err := resolveAddr(c.str("address"))
+	addr, err := resolveAddr(c.str("ip"))
 	if err != nil {
 		c.fail("err.bad_address")
 		return
@@ -278,149 +307,67 @@ func cmdServersAdd(c *ictx) {
 	c.deferReply(true)
 	st, err := queryInfo(addr)
 	if err != nil {
-		c.edit("❌ "+c.t("err.no_response", code(addr)), nil)
+		c.edit("❌ " + c.t("err.no_response", code(addr)))
 		return
 	}
-	sv := Server{GuildID: c.guild(), ChannelID: channelID, Address: addr, MinPlayers: minP, LastMap: st.Map, Name: st.Name}
+	if !st.IsCS2() {
+		c.edit("❌ " + c.t("err.not_cs2", code(addr)))
+		return
+	}
+	sv := Server{GuildID: c.guild(), ChannelID: channelID, Address: addr, MinPlayers: minP, LastMap: st.Map, Name: st.Name, Style: cardStyle(c.str("style"))}
 	_, err = db.AddServer(sv)
 	switch {
 	case isUnique(err):
-		c.edit("❌ "+c.t("err.already_tracked", code(addr)), nil)
+		c.edit("❌ " + c.t("err.already_tracked", code(addr)))
 	case err != nil:
 		slog.Error("add server", "err", err)
-		c.edit("❌ "+c.t("err.internal"), nil)
+		c.edit("❌ " + c.t("err.internal"))
 	default:
-		c.edit("✅ "+c.t("servers.added", sv.Display(), channelID, minP), nil)
+		c.edit("✅ " + c.t("servers.added", sv.Display(), channelID, minP))
 	}
 }
 
-func cmdServersList(c *ictx) {
-	list, err := db.Servers(c.guild())
-	if err != nil {
-		c.fail("err.internal")
-		return
+// cardStyle turns the style option into a stored value; anything unexpected is "full".
+func cardStyle(s string) string {
+	if s == "compact" {
+		return s
 	}
-	if len(list) == 0 {
-		c.reply(c.t("err.no_servers"))
-		return
-	}
-	var b strings.Builder
-	for _, s := range list {
-		fmt.Fprintf(&b, "%s\n%s\n\n", s.Display(), c.t("servers.list_line", s.ChannelID, s.MinPlayers, code(s.LastMap)))
-	}
-	c.respond(&discordgo.InteractionResponseData{Embeds: []*discordgo.MessageEmbed{{
-		Title: c.t("servers.list_title"), Description: truncate(b.String(), 4000), Color: colorShiron}}}, true)
-}
-
-func cmdServersRemove(c *ictx) {
-	sv, errKey := c.server()
-	if errKey != "" {
-		c.fail(errKey)
-		return
-	}
-	if _, err := db.RemoveServer(c.guild(), sv.ID); err != nil {
-		c.fail("err.internal")
-		return
-	}
-	c.ok("servers.removed", sv.Display())
-}
-
-func cmdServersMinPlayers(c *ictx) {
-	sv, errKey := c.server()
-	if errKey != "" {
-		c.fail(errKey)
-		return
-	}
-	v := c.int("min_players", 0)
-	if _, err := db.SetMinPlayers(c.guild(), sv.ID, v); err != nil {
-		c.fail("err.internal")
-		return
-	}
-	c.ok("servers.min_set", sv.Display(), v)
+	return "full"
 }
 
 // ---------- /map and /players ----------
 
-// statusEmbed shows a server's live state. The server name goes in the title, which
-// Discord shows as plain text, so a name can't smuggle in links or formatting.
-func statusEmbed(loc, addr string, st *Status) *discordgo.MessageEmbed {
-	e := &discordgo.MessageEmbed{Title: truncate(st.Name, 256), Color: colorShiron, Fields: []*discordgo.MessageEmbedField{
-		{Name: T(loc, "field.map"), Value: code(st.Map), Inline: true},
-		{Name: T(loc, "field.players"), Value: T(loc, "players.count", st.Humans(), st.Max, st.Bots), Inline: true},
-		{Name: T(loc, "field.connect"), Value: code("connect " + addr)},
-	}}
-	if img := mapImage(st.Map); img != "" {
-		e.Image = &discordgo.MessageEmbedImage{URL: img}
+// lookup is the shared start of /map and /players: pick the server, apply the
+// cooldown, defer, and query it. Returns nil after replying if anything failed.
+func (c *ictx) lookup() (*Server, *Status) {
+	sv, errKey := c.server()
+	if errKey != "" {
+		c.fail(errKey)
+		return nil, nil
 	}
-	return e
-}
-
-// joinButton is a link button that opens CS2 and joins the server, via the
-// https page in SHIRON_CONNECT_URL (Discord only allows http(s) links on buttons).
-func joinButton(loc, addr string) []discordgo.MessageComponent {
-	if cfg.ConnectURL == "" {
-		return nil
+	if onCooldown(c.user()) {
+		c.fail("err.cooldown", int(queryCooldown.Seconds()))
+		return nil, nil
 	}
-	return []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-		discordgo.Button{Label: T(loc, "button.join"), Style: discordgo.LinkButton, URL: cfg.ConnectURL + "#" + addr},
-	}}}
+	c.respondV2(false, skeletonCard(c.loc, *sv)) // instant answer instead of "is thinking…"
+	st, err := queryInfo(sv.Address)
+	if err != nil {
+		c.editV2(textV2("❌ " + c.t("err.no_response", sv.Display())))
+		return nil, nil
+	}
+	return sv, st
 }
 
 func cmdMap(c *ictx) {
-	sv, errKey := c.server()
-	if errKey != "" {
-		c.fail(errKey)
-		return
+	if sv, st := c.lookup(); sv != nil {
+		c.editV2(serverCard(c.loc, *sv, st, ""))
 	}
-	if onCooldown(c.user()) {
-		c.fail("err.cooldown", int(queryCooldown.Seconds()))
-		return
-	}
-	c.deferReply(false)
-	st, err := queryInfo(sv.Address)
-	if err != nil {
-		c.edit("❌ "+c.t("err.no_response", sv.Display()), nil)
-		return
-	}
-	c.edit("", statusEmbed(c.loc, sv.Address, st), joinButton(c.loc, sv.Address)...)
 }
 
 func cmdPlayers(c *ictx) {
-	sv, errKey := c.server()
-	if errKey != "" {
-		c.fail(errKey)
-		return
+	if sv, st := c.lookup(); sv != nil {
+		c.editV2(withText(fullCard(c.loc, *sv, st, ""), playerList(c.loc, sv.Address, st.Humans()))) // a scoreboard needs the full card
 	}
-	if onCooldown(c.user()) {
-		c.fail("err.cooldown", int(queryCooldown.Seconds()))
-		return
-	}
-	c.deferReply(false)
-	st, err := queryInfo(sv.Address)
-	if err != nil {
-		c.edit("❌ "+c.t("err.no_response", sv.Display()), nil)
-		return
-	}
-	e := statusEmbed(c.loc, sv.Address, st)
-	players, err := queryPlayers(sv.Address)
-	// A code block: player names are chosen by players, so nothing in them may render.
-	var b strings.Builder
-	for _, p := range players {
-		if p.Name == "" {
-			continue // connecting players have no name yet
-		}
-		name := truncate(strings.ReplaceAll(p.Name, "`", "'"), 24)
-		fmt.Fprintf(&b, "%-24s %5d  %s\n", name, p.Score, (time.Duration(p.Duration) * time.Second).Truncate(time.Minute))
-	}
-	switch {
-	case err == nil && b.Len() > 0:
-		e.Description = "```\n" + truncate(b.String(), 3900) + "```"
-	case st.Humans() > 0:
-		e.Description = c.t("players.hidden")
-	default:
-		e.Description = c.t("players.empty")
-	}
-	c.edit("", e, joinButton(c.loc, sv.Address)...)
 }
 
 // ---------- /notify ----------
@@ -432,14 +379,24 @@ func matchMap(pattern, mapName string) bool {
 }
 
 func cmdNotifyAdd(c *ictx) {
-	pattern := strings.ToLower(c.str("map"))
-	if _, err := path.Match(pattern, ""); err != nil || pattern == "" || len(pattern) > 64 {
+	pattern, err := cleanPattern(c.str("map"))
+	if err != nil {
 		c.fail("err.bad_pattern")
 		return
 	}
-	sv, errKey := c.server()
-	if errKey != "" {
-		c.fail(errKey)
+	// No server chosen means every server tracked here (now and later), so a map is
+	// caught wherever it comes up.
+	var serverID int64
+	where := c.t("notify.all_servers")
+	if c.str("server") != "" {
+		sv, errKey := c.server()
+		if errKey != "" {
+			c.fail(errKey)
+			return
+		}
+		serverID, where = sv.ID, sv.Display()
+	} else if list, err := db.Servers(c.guild()); err != nil || len(list) == 0 {
+		c.fail("err.no_servers")
 		return
 	}
 	existing, err := db.Notifies(c.user(), c.guild())
@@ -451,58 +408,22 @@ func cmdNotifyAdd(c *ictx) {
 		c.fail("err.too_many_notifies", maxNotifiesPerUser)
 		return
 	}
-	switch err := db.AddNotify(c.user(), sv.ID, pattern); {
+	switch err := db.AddNotify(c.user(), c.guild(), serverID, pattern); {
 	case isUnique(err):
 		c.fail("err.already_notify", code(pattern))
 	case err != nil:
 		c.fail("err.internal")
 	default:
-		c.ok("notify.added", code(pattern), sv.Display(), c.t("mode."+db.Delivery(c.user())))
+		c.ok("notify.added", code(pattern), where, c.t("mode."+db.Delivery(c.user())))
 	}
 }
 
-func cmdNotifyRemove(c *ictx) {
-	id, _ := strconv.ParseInt(c.str("notification"), 10, 64)
-	removed, err := db.RemoveNotify(c.user(), id)
-	switch {
-	case err != nil:
-		c.fail("err.internal")
-	case !removed:
-		c.fail("err.notify_not_found")
-	default:
-		c.ok("notify.removed")
+// notifyWhere names where an alert applies, safe for a message.
+func notifyWhere(loc string, n Notify) string {
+	if n.AllServers() {
+		return T(loc, "notify.all_servers")
 	}
-}
-
-func cmdNotifyList(c *ictx) {
-	list, err := db.Notifies(c.user(), c.guild())
-	if err != nil {
-		c.fail("err.internal")
-		return
-	}
-	mode := c.t("mode." + db.Delivery(c.user()))
-	if len(list) == 0 {
-		c.reply(c.t("notify.none", mode))
-		return
-	}
-	var b strings.Builder
-	for _, n := range list {
-		fmt.Fprintf(&b, "%s — %s\n", code(n.Pattern), n.Server.Display())
-	}
-	c.reply(truncate(c.t("notify.list", mode)+"\n"+b.String(), 2000))
-}
-
-func cmdNotifyMode(c *ictx) {
-	mode := c.str("mode")
-	if mode != "dm" && mode != "channel" {
-		c.fail("err.internal")
-		return
-	}
-	if err := db.SetDelivery(c.user(), mode); err != nil {
-		c.fail("err.internal")
-		return
-	}
-	c.ok("notify.mode_set", c.t("mode."+mode))
+	return n.Server.Display()
 }
 
 // ---------- autocomplete ----------
@@ -530,11 +451,6 @@ func onAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		list, _ := db.Servers(c.guild())
 		for _, sv := range list {
 			add(sv.Label(), sv.ID)
-		}
-	case "notification":
-		list, _ := db.Notifies(c.user(), c.guild())
-		for _, n := range list {
-			add(n.Pattern+" — "+n.Server.Label(), n.ID)
 		}
 	}
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{

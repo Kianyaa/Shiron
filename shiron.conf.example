@@ -1,0 +1,24 @@
+# Shiron settings. Copy this file to shiron.conf (next to shiron.exe) and edit it.
+# shiron.conf is git-ignored. Lines starting with # are ignored.
+# The bot token goes in token.txt, not here.
+
+# Page behind the "Join server" button. Remove or leave empty to hide the button.
+SHIRON_CONNECT_URL=https://kianyaa.github.io/shiron-join/connect.html
+
+# Spinner shown while a server is checked. Upload assets/loading.gif in the Developer
+# Portal (your app > Emojis), name it "loading", copy its markdown, and paste it here.
+#SHIRON_LOADING_EMOJI=<a:loading:123456789012345678>
+
+# Profile bio, set by Shiron on startup (max 400 characters). /commands become clickable;
+# commands with subcommands need the subcommand, like /servers add. Remove to keep the
+# Developer Portal text instead.
+SHIRON_BIO=Tracks CS2 community servers: live maps, players and map-change alerts. Type /help to see all commands.
+
+# How often to check servers (minimum 10s).
+#SHIRON_POLL=60s
+
+# Database file.
+#SHIRON_DB=shiron.db
+
+# Map pictures: a URL with one %s for the map name, or "none".
+#SHIRON_MAP_IMAGES=https://raw.githubusercontent.com/ghostcap-gaming/cs2-map-images/main/cs2/%s.png
