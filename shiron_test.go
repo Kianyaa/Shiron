@@ -1260,4 +1260,9 @@ func TestStore(t *testing.T) {
 	if all, _ := s.Servers(""); len(all) != 0 {
 		t.Fatalf("DeleteGuild left %d servers", len(all))
 	}
+	var prefs int
+	s.QueryRow("SELECT COUNT(*) FROM user_prefs").Scan(&prefs)
+	if prefs != 0 {
+		t.Fatalf("DeleteGuild left %d saved DM/channel choices for users with no alerts", prefs)
+	}
 }

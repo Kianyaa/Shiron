@@ -258,7 +258,11 @@ func (db *Store) DeleteGuild(guild string) error {
 	if _, err := db.Exec("DELETE FROM map_pictures WHERE guild_id = ?", guild); err != nil {
 		return err
 	}
-	_, err := db.Exec("DELETE FROM guild_collections WHERE guild_id = ?", guild)
+	if _, err := db.Exec("DELETE FROM guild_collections WHERE guild_id = ?", guild); err != nil {
+		return err
+	}
+	// Users with no alerts left anywhere: drop their DM/channel choice too.
+	_, err := db.Exec("DELETE FROM user_prefs WHERE user_id NOT IN (SELECT user_id FROM notifications)")
 	return err
 }
 

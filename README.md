@@ -129,7 +129,8 @@ Only outbound internet access is needed; no ports have to be opened. Back up `sh
 ## Notes
 
 - One process serves every Discord server. Discord requires sharding above ~2,500 servers; Shiron doesn't shard yet.
-- Discord asks bot owners to verify their identity once the bot is in 100 servers.
+- Discord asks bot owners to verify their identity once the bot is in 100 servers (you can apply at 75).
+- The [Privacy Policy](docs/privacy.html) and [Terms of Service](docs/terms.html) are served by GitHub Pages next to `connect.html`. Put their links (`https://<your-github-name>.github.io/<repo-name>/privacy.html` and `terms.html`) in the Developer Portal under **General Information**, and replace the `your-github-name/repo-name` contact link inside both pages.
 
 ## License
 

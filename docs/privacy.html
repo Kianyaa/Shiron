@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Privacy Policy – Shiron</title>
+<style>
+  body { margin: 0; font: 16px/1.6 system-ui, sans-serif; background: #1e1f22; color: #f2f3f5; }
+  main { padding: 2rem; max-width: 46rem; margin: 0 auto; }
+  h2 { margin-top: 2rem; }
+  code { background: #2b2d31; padding: .1em .4em; border-radius: 4px; }
+  a { color: #8ea1e1; }
+  .muted { color: #b5bac1; }
+</style>
+</head>
+<body>
+<main>
+<h1>Shiron Privacy Policy</h1>
+<p class="muted">Last updated: 19 November 2026</p>
+
+<p>Shiron is a Discord bot that tracks Counter-Strike 2 game servers and posts map changes and alerts. This page explains what data Shiron stores, why, and how to delete it. Shiron is open source, so you can check everything here in its code.</p>
+
+<h2>What Shiron stores</h2>
+<ul>
+  <li><b>Tracked servers</b>, set up by server admins: the Discord server ID, the channel ID for posts, the game server address (and the IP it resolves to), its name, the last map seen, and the settings chosen in <code>/servers list</code>.</li>
+  <li><b>Map alerts</b> you create with <code>/notify</code> or 🔔 Notify me: your Discord user ID, the Discord server ID, the game server (or "all servers"), and the map name or pattern.</li>
+  <li><b>Your delivery choice</b>: your Discord user ID and whether alerts reach you by DM or by a mention in the channel.</li>
+  <li><b>Map pictures and Workshop collections</b> that admins add: the Discord server ID, the map name and the link.</li>
+</ul>
+<p>Shiron does <b>not</b> read or store message content, does not collect email addresses, IP addresses of Discord users, or payment information, and does not sell or share data with anyone. It only asks Discord for the <code>Guilds</code> gateway intent.</p>
+
+<h2>Temporary data</h2>
+<ul>
+  <li>To send DMs quickly, Shiron keeps your DM channel ID in memory. This is gone when the bot restarts.</li>
+  <li>Server logs can contain Discord user, server and channel IDs when something fails (for example a DM that couldn't be sent). Logs are only used to fix problems and are not shared.</li>
+</ul>
+
+<h2>Why it's stored</h2>
+<p>Only to provide Shiron's features: posting map changes, sending the alerts you asked for, and showing the right settings in the panels.</p>
+
+<h2>Services Shiron contacts</h2>
+<ul>
+  <li><b>Discord</b>, to receive commands and send messages.</li>
+  <li><b>The CS2 game servers</b> being tracked, to read their map and player count.</li>
+  <li><b>Steam Web API</b> and <b>GitHub</b>, to find map pictures. Only map names and collection IDs are sent, never anything about you.</li>
+</ul>
+
+<h2>How to delete your data</h2>
+<ul>
+  <li><b>Your alerts and delivery choice:</b> open <code>/notify list</code> and press <b>Remove all</b>. Once you have no alerts left in any server, your saved DM/channel choice is deleted too.</li>
+  <li><b>A server's data:</b> admins can remove servers in <code>/servers list</code>. When Shiron is removed from a Discord server, everything stored for that server is deleted right away, including its members' alerts there.</li>
+  <li>For anything else, contact us (below) and we'll delete it.</li>
+</ul>
+
+<h2>Children</h2>
+<p>Shiron is meant for people who meet Discord's minimum age. It doesn't knowingly collect anything beyond the Discord IDs described above.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, the date above is updated and the change is noted in Shiron's changelog (<code>/about</code>).</p>
+
+<h2>Contact</h2>
+<p>Open an issue on Shiron's GitHub repository: <a href="https://github.com/your-github-name/repo-name/issues">github.com/your-github-name/repo-name/issues</a>.</p>
+</main>
+</body>
+</html>
