@@ -106,6 +106,8 @@ Check a CS2 server without Discord:
 
 ## 3. Deploy
 
+**Free hosting, step by step:** [deploy/ORACLE.md](deploy/ORACLE.md) sets Shiron up on Oracle Cloud's Always Free Arm server with one command, including daily backups. The manual steps below work on any Linux server.
+
 Build for a Linux server from any machine (no C compiler needed):
 
 ```bash
