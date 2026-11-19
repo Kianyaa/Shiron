@@ -3,7 +3,7 @@
 # The bot token goes in token.txt, not here.
 
 # Page behind the "Join server" button. Remove or leave empty to hide the button.
-SHIRON_CONNECT_URL=https://kianyaa.github.io/shiron-join/connect.html
+SHIRON_CONNECT_URL=https://kianyaa.github.io/Shiron/connect.html
 
 # Spinner shown while a server is checked. Upload assets/loading.gif in the Developer
 # Portal (your app > Emojis), name it "loading", copy its markdown, and paste it here.
