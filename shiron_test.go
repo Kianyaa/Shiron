@@ -268,7 +268,7 @@ func TestDefaultServer(t *testing.T) {
 func TestNotificationsMigration(t *testing.T) {
 	// A database from before all-server alerts: alerts must survive the upgrade.
 	path := filepath.Join(t.TempDir(), "old.db")
-	old, err := sql.Open("sqlite", path)
+	old, err := sql.Open("sqlite3", path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestNotificationsMigration(t *testing.T) {
 func TestStyleMigration(t *testing.T) {
 	// A database from before card styles existed must gain the column on open.
 	path := filepath.Join(t.TempDir(), "old.db")
-	old, err := sql.Open("sqlite", path)
+	old, err := sql.Open("sqlite3", path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1003,6 +1003,11 @@ func TestLoadConfig(t *testing.T) {
 	os.WriteFile(file, []byte("  secret-token\n"), 0o600)
 	t.Setenv("SHIRON_CONF", filepath.Join(dir, "none.conf")) // ignore the developer's own shiron.conf
 	t.Setenv("SHIRON_TOKEN", "")
+	t.Setenv("DISCORD_TOKEN", "host-token")
+	if c, _ := loadConfig(); c.Token != "host-token" {
+		t.Fatalf("DISCORD_TOKEN should be used when SHIRON_TOKEN is empty, got %q", c.Token)
+	}
+	t.Setenv("DISCORD_TOKEN", "")
 	t.Setenv("SHIRON_TOKEN_FILE", file)
 	c, err := loadConfig()
 	if err != nil || c.Token != "secret-token" {

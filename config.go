@@ -61,7 +61,7 @@ func loadConfig() (Config, error) {
 		return Config{}, err
 	}
 	c := Config{
-		Token:      os.Getenv("SHIRON_TOKEN"),
+		Token:      envOr("SHIRON_TOKEN", os.Getenv("DISCORD_TOKEN")), // DISCORD_TOKEN: the name bot hosts use
 		DB:         envOr("SHIRON_DB", "shiron.db"),
 		Poll:       60 * time.Second,
 		ConnectURL: os.Getenv("SHIRON_CONNECT_URL"),

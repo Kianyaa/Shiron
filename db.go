@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"strings"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/ncruces/go-sqlite3/driver" // SQLite compiled to Wasm: pure Go, light to build
+	_ "github.com/ncruces/go-sqlite3/embed"
 )
 
 type Store struct{ *sql.DB }
@@ -72,7 +73,7 @@ CREATE TABLE IF NOT EXISTS map_pictures (
 );`
 
 func openDB(path string) (*Store, error) {
-	d, err := sql.Open("sqlite", path)
+	d, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, err
 	}
