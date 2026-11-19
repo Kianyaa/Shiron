@@ -15,23 +15,18 @@ In the panel: **Bots → Host a bot → Discord bot → your own repository**.
 - **Repository:** `Kianyaa/Shiron`, branch `main`
 - **Discord bot token:** paste the token. FadeHost passes it to Shiron as `DISCORD_TOKEN`.
 
-Then on the bot's **Settings → Build & start**:
-
-| Field | Value |
-|---|---|
-| Build command | `GOGC=20 GOFLAGS=-p=1 go build -trimpath -ldflags="-s -w" -o shiron .` |
-| Start command | `./shiron` |
-
-The build command keeps the compiler under the 256 MB limit; without it the build runs out of memory.
+Leave **Build command** and **Start command** empty: FadeHost compiles Go modules itself (`go build -o /data/bin/app .`) and starts the result.
 
 ## 3. Environment variables
 
-On the bot's environment table, add:
+On the bot's environment table, add these. The first three keep FadeHost's own compile step under the 256 MB limit; without them it can run out of memory.
 
 | Name | Value | Why |
 |---|---|---|
-| `SHIRON_DB` | `/data/shiron.db` | `/data` is kept across deploys; the code folder is reset |
+| `GOGC` | `20` | The compiler (and the bot) free memory sooner |
+| `GOFLAGS` | `-p=1` | Compile one package at a time |
 | `GOMEMLIMIT` | `150MiB` | Keeps memory well under 256 MB |
+| `SHIRON_DB` | `/data/shiron.db` | `/data` is kept across deploys; the code folder is reset |
 | `SHIRON_CONNECT_URL` | `https://kianyaa.github.io/Shiron/connect.html` | Join server button |
 | `SHIRON_BIO` | (optional) your bot's profile text | |
 | `SHIRON_LOADING_EMOJI` | (optional) like `<a:loading:123…>` | |
