@@ -1,10 +1,37 @@
+<div align="center">
+
+<img src="assets/shiron.png" alt="Shiron" width="140">
+
 # Shiron
 
-A small, fast Discord bot that tracks **CS2 servers**. One program file, no database server, speaks English, Thai and Simplified Chinese.
+**A small, fast Discord bot that tracks Counter-Strike 2 servers.**<br>
+Live map cards, map-change alerts and map pictures. One program file, no database server.
 
-- Posts a message in a channel when a tracked server changes map, with a picture of the map and an optional minimum player count.
-- `/map` and `/players` show live server info, with a **Join server** button that opens CS2 and connects.
-- `/notify` alerts users (by DM or a channel mention, their choice) when a map they want comes up. Wildcards like `de_*` work.
+[![Stars](https://img.shields.io/github/stars/Kianyaa/Shiron?style=flat&logo=github&color=8787ff)](https://github.com/Kianyaa/Shiron/stargazers)
+[![Go](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go&logoColor=white)](go.mod)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL%20v3-blue)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-bot-5865F2?logo=discord&logoColor=white)](#1-create-the-discord-application)
+[![Last commit](https://img.shields.io/github/last-commit/Kianyaa/Shiron?color=5fd787)](https://github.com/Kianyaa/Shiron/commits/main)
+
+**English** · [ภาษาไทย](README.th.md) · [简体中文](README.zh-CN.md)
+
+</div>
+
+> [!TIP]
+> If Shiron is useful to your community, please give it a ⭐ on GitHub. It helps other CS2 server owners find it.
+
+## Features
+
+- 🗺️ **Map-change posts** in a channel, with a picture of the map and an optional minimum player count.
+- 📊 **`/map` and `/players`** show live server info, with a **Join server** button that opens CS2 and connects.
+- 🔔 **Alerts** by DM or a channel mention when a map you want comes up. Wildcards like `ze_*` work, for one server or all of them.
+- 🟢 **Offline / back-online posts** that say when a server was last seen and how long it was down.
+- 🖼️ **Map pictures** from Steam Workshop, community packs or your own Workshop collections.
+- 🛠️ **Control panels** with buttons: `/servers list` for admins, `/notify list` for everyone.
+- 🌏 **English, Thai and Simplified Chinese**, following each user's Discord language.
+- 🪶 **Lean**: one program, SQLite built in, no privileged intents, runs on a free cloud server.
+
+<p align="center"><img src="assets/cli.svg" alt="Shiron's startup window: banner, setup steps, status panel and live status lines" width="720"></p>
 
 ## Commands
 
@@ -69,7 +96,7 @@ Without it, Shiron still shows the `connect IP:port` console command.
 
 ### Map pictures
 
-By default, pictures come from the community [cs2-map-images](https://github.com/ghostcap-gaming/cs2-map-images) collection. Official maps like `de_dust2` are covered. Custom maps (ZE, surf and similar) usually aren't, so those posts have no picture. To use your own pictures, host PNGs named after the map and point `SHIRON_MAP_IMAGES` at them, e.g. `https://example.com/maps/%s.png`.
+By default, pictures come from the community [cs2-map-images](https://github.com/ghostcap-gaming/cs2-map-images) collection. Official maps like `de_dust2` are covered. Custom maps (ZE, surf and similar) are looked up on Steam Workshop, and admins can link their own Workshop collections or set a picture for any map in `/servers list`. To use your own picture host instead, host PNGs named after the map and point `SHIRON_MAP_IMAGES` at them, e.g. `https://example.com/maps/%s.png`.
 
 Check a CS2 server without Discord:
 
@@ -131,6 +158,10 @@ Only outbound internet access is needed; no ports have to be opened. Back up `sh
 - One process serves every Discord server. Discord requires sharding above ~2,500 servers; Shiron doesn't shard yet.
 - Discord asks bot owners to verify their identity once the bot is in 100 servers (you can apply at 75).
 - The [Privacy Policy](https://kianyaa.github.io/Shiron/privacy.html) and [Terms of Service](https://kianyaa.github.io/Shiron/terms.html) are served by GitHub Pages from `docs/`, next to `connect.html`. They are linked in the Developer Portal under **General Information**. If you host your own copy, change the contact link inside both pages.
+
+## Star history
+
+[![Star history chart](https://api.star-history.com/svg?repos=Kianyaa/Shiron&type=Date)](https://star-history.com/#Kianyaa/Shiron&Date)
 
 ## License
 
