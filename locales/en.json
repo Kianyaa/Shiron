@@ -84,6 +84,8 @@
   "card.changed": "🔁 Map changed from %s",
   "card.since": "⏭️ Map has since changed to %s · <t:%d:t>",
   "card.footer": "%d bots · updated at <t:%[2]d:t> · <t:%[2]d:R>",
+  "card.claimed": "⚠️ Server claims %d players, but its player list shows fewer",
+  "card.map_started": "🕒 Map started at <t:%[1]d:t> · <t:%[1]d:R>",
   "card.ip": "Join %s by pasting this into the CS2 console:",
   "players.title": "Players · %d / %d",
   "players.col_score": "SCORE",

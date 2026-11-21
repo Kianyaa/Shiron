@@ -70,7 +70,29 @@ CREATE TABLE IF NOT EXISTS map_pictures (
 	map TEXT NOT NULL,
 	url TEXT NOT NULL,
 	PRIMARY KEY (guild_id, map)
+);
+-- When each game server's current map started, as first seen by Shiron. known = 0 when
+-- Shiron never saw the change (the map was already running when tracking began).
+CREATE TABLE IF NOT EXISTS map_starts (
+	address TEXT PRIMARY KEY,
+	map TEXT NOT NULL,
+	since INTEGER NOT NULL,
+	known INTEGER NOT NULL
 );`
+
+// MapStart returns what Shiron last recorded about a server's map; ok is false when
+// it has no record.
+func (db *Store) MapStart(addr string) (m mapStart, ok bool) {
+	err := db.QueryRow("SELECT map, since, known FROM map_starts WHERE address = ?", addr).Scan(&m.name, &m.since, &m.known)
+	return m, err == nil
+}
+
+func (db *Store) SetMapStart(addr string, m mapStart) error {
+	_, err := db.Exec("INSERT INTO map_starts (address, map, since, known) VALUES (?,?,?,?) "+
+		"ON CONFLICT(address) DO UPDATE SET map = excluded.map, since = excluded.since, known = excluded.known",
+		addr, m.name, m.since, m.known)
+	return err
+}
 
 func openDB(path string) (*Store, error) {
 	d, err := sql.Open("sqlite3", path)

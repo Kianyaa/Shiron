@@ -76,8 +76,8 @@ func compactCard(loc string, sv Server, st *Status, prevMap string) discordgo.Co
 	}
 	// <t:…:R> is counted live by each Discord app ("29 seconds ago"), so it costs nothing.
 	now := time.Now().Unix()
-	fmt.Fprintf(&t, "### %s\n-# %s\n%s  **%d / %d**  ·  <t:%d:t> · <t:%d:R>",
-		plain(st.Map), plain(truncate(st.Name, 60)), playerBar(st, 5), st.Humans(), st.Max, now, now)
+	fmt.Fprintf(&t, "### %s\n-# %s\n%s  **%d / %d**  ·  <t:%d:t> · <t:%d:R>%s",
+		plain(st.Map), plain(truncate(st.Name, 60)), playerBar(st, 5), st.Humans(), st.Max, now, now, cardNotes(loc, st))
 	var top discordgo.MessageComponent = discordgo.TextDisplay{Content: t.String()}
 	if img := mapPicture(sv.GuildID, st.Map); img != "" {
 		top = discordgo.Section{Components: []discordgo.MessageComponent{discordgo.TextDisplay{Content: t.String()}},
@@ -105,11 +105,24 @@ func fullCard(loc string, sv Server, st *Status, prevMap string) discordgo.Conta
 	head.WriteString("## " + plain(st.Map) + "\n" + plain(st.Name))
 	parts = append(parts,
 		discordgo.TextDisplay{Content: head.String()},
-		discordgo.TextDisplay{Content: fmt.Sprintf("%s  **%d / %d**\n-# %s",
-			playerBar(st, 10), st.Humans(), st.Max, T(loc, "card.footer", st.Bots, time.Now().Unix()))},
+		discordgo.TextDisplay{Content: fmt.Sprintf("%s  **%d / %d**%s\n-# %s",
+			playerBar(st, 10), st.Humans(), st.Max, cardNotes(loc, st), T(loc, "card.footer", st.Bots, time.Now().Unix()))},
 		discordgo.ActionsRow{Components: cardButtons(loc, sv)},
 	)
 	return discordgo.Container{AccentColor: ptr(accent(st)), Components: parts}
+}
+
+// cardNotes is the small print under the player count: a warning when the server's
+// count is fake, and when the current map started (both only when known).
+func cardNotes(loc string, st *Status) string {
+	var b strings.Builder
+	if st.Claimed > 0 {
+		b.WriteString("\n-# " + T(loc, "card.claimed", st.Claimed))
+	}
+	if st.MapSince > 0 {
+		b.WriteString("\n-# " + T(loc, "card.map_started", st.MapSince))
+	}
+	return b.String()
 }
 
 // skeletonCard is sent instantly while a server is being queried, instead of Discord's

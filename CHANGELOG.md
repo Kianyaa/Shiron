@@ -4,6 +4,12 @@ Shiron shows the newest entry in `/about` and the last few under **Full changelo
 Add each new version above the others: a level-2 heading with the version, a middle dot and
 the date (like the one below), then one bullet line per change.
 
+## v1.0.2 · 2026-11-21
+- Fake player counts: when a server reports more players than its player list shows, cards show the real count with a ⚠️ note
+- Cards show when the current map started, next to when they were last updated
+- More map pictures: simple, dark previews are no longer mistaken for blank ones
+- Runs on small free hosts: lighter database library, and the token can come from `DISCORD_TOKEN`
+
 ## v1.0.1 · 2026-11-19
 - `/notify list`: edit each alert (map, one server or all servers), and Remove all, which also deletes your saved DM/channel choice
 - 🔔 Notify me answers privately with a 🔕 Stop alerts button; DM alerts offer Stop alerts directly

@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/jpeg" // Workshop previews
+	_ "image/png"
 	"io"
 	"log/slog"
 	"net/http"
@@ -247,13 +251,17 @@ func pickPreviewsExact(items []workshopItem, name string) []string {
 	return urls
 }
 
-// minPreviewBytes rejects placeholder previews: a plain black JPEG is about 4 KB,
-// real screenshots are 15 KB and up.
-const minPreviewBytes = 8000
+const (
+	// minPreviewBytes: anything smaller is too small to be a picture at all.
+	minPreviewBytes = 2000
+	// maxPreviewBytes caps how much of a preview is read to check it.
+	maxPreviewBytes = 8 << 20
+)
 
-// realPicture reports whether a preview looks like an actual picture by reading its
-// first minPreviewBytes. A size-only (HEAD) check isn't enough: Steam's image server
-// sometimes answers HEAD with 404 for pictures that download fine.
+// realPicture reports whether a preview is an actual picture, not a blank placeholder
+// (Workshop uploads without a screenshot get a plain black one). It looks at the pixels:
+// file size alone misjudges simple pictures, like a dark scene that compresses to 6 KB.
+// It downloads with GET because Steam's image server sometimes answers HEAD with 404.
 func realPicture(u string) (bool, error) {
 	resp, err := httpClient.Get(u)
 	if err != nil {
@@ -263,8 +271,33 @@ func realPicture(u string) (bool, error) {
 	if resp.StatusCode != http.StatusOK {
 		return false, nil
 	}
-	n, _ := io.CopyN(io.Discard, resp.Body, minPreviewBytes)
-	return n >= minPreviewBytes, nil
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxPreviewBytes))
+	if err != nil || len(data) < minPreviewBytes {
+		return false, nil
+	}
+	if c, _, err := image.DecodeConfig(bytes.NewReader(data)); err != nil || c.Width*c.Height > 4_000_000 {
+		return true, nil // unknown format or a huge picture (too much memory to check): trust it
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return true, nil // a format we can't decode (like WebP or GIF): trust it
+	}
+	return !blankImage(img), nil
+}
+
+// blankImage reports whether a picture is (nearly) one flat color, by sampling a grid
+// of pixels and comparing their brightness.
+func blankImage(img image.Image) bool {
+	b := img.Bounds()
+	lo, hi := uint32(1<<16), uint32(0)
+	for y := b.Min.Y; y < b.Max.Y; y += max(b.Dy()/32, 1) {
+		for x := b.Min.X; x < b.Max.X; x += max(b.Dx()/32, 1) {
+			r, g, bl, _ := img.At(x, y).RGBA()
+			l := (r*299 + g*587 + bl*114) / 1000
+			lo, hi = min(lo, l), max(hi, l)
+		}
+	}
+	return hi-lo < 0x0c00 // under ~5% brightness range: a flat placeholder
 }
 
 // workshopPreview finds a CS2 Workshop map by name and returns its preview picture. It

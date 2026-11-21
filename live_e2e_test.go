@@ -726,14 +726,14 @@ func TestE2E(t *testing.T) {
 	t.Run("/about and its Full changelog button", func(t *testing.T) {
 		reqs := run("about", click(t, 2, map[string]any{"id": "c", "name": "about", "type": 1}, nil, false))
 		txt := allText(reqs[0].Body)
-		for _, want := range []string{"## ShironBot", "v1.0.1", "What's new in v1.0.1", "CS2 servers tracked", "[label:Invite Shiron]", "[id:about:log]"} {
+		for _, want := range []string{"## ShironBot", "v1.0.2", "What's new in v1.0.2", "CS2 servers tracked", "[label:Invite Shiron]", "[id:about:log]"} {
 			if !strings.Contains(txt, want) {
 				t.Errorf("/about missing %q:\n%s", want, txt)
 			}
 		}
 		reqs = run("changelog", click(t, 3, press("about:log"), nil, false))
-		if f, _ := reqs[0].Body["data"].(map[string]any)["flags"].(float64); int(f)&64 == 0 || !strings.Contains(allText(reqs[0].Body), "**v1.0.1**") {
-			t.Errorf("changelog should be private and list v1.0.1: %s", allText(reqs[0].Body))
+		if f, _ := reqs[0].Body["data"].(map[string]any)["flags"].(float64); int(f)&64 == 0 || !strings.Contains(allText(reqs[0].Body), "**v1.0.2**") {
+			t.Errorf("changelog should be private and list v1.0.2: %s", allText(reqs[0].Body))
 		}
 	})
 
