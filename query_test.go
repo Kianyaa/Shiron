@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 func TestNoteMap(t *testing.T) {
@@ -33,14 +35,25 @@ func TestNoteMap(t *testing.T) {
 	}
 }
 
-func TestCardNotes(t *testing.T) {
-	if got := cardNotes("en-US", &Status{}); got != "" {
-		t.Fatalf("nothing to note: %q", got)
+func TestCardTimes(t *testing.T) {
+	if got := mapStarted("en-US", &Status{}); got != "" {
+		t.Fatalf("unknown start: %q", got)
 	}
-	got := cardNotes("en-US", &Status{Claimed: 16, MapSince: 1700000000})
-	for _, want := range []string{"claims 16 players", "Map started at <t:1700000000:t> · <t:1700000000:R>"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing %q in %q", want, got)
+	// A server faking 16 players while listing 1: the card shows 1, with no warning.
+	st := &Status{Map: "ze_x", Players: 1, Max: 65, Claimed: 16, MapSince: 1700000000}
+	card := fullCard("en-US", Server{Address: "1.2.3.4:27015"}, st, "")
+	text := ""
+	for _, c := range card.Components {
+		if td, ok := c.(discordgo.TextDisplay); ok {
+			text += td.Content + "\n"
 		}
+	}
+	for _, want := range []string{"**1 / 65**", "Map started at <t:1700000000:t> (<t:1700000000:R>)", "updated at <t:"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %q in %q", want, text)
+		}
+	}
+	if strings.Contains(text, "16") {
+		t.Errorf("the fake count shouldn't show: %q", text)
 	}
 }

@@ -5,7 +5,7 @@ Add each new version above the others: a level-2 heading with the version, a mid
 the date (like the one below), then one bullet line per change.
 
 ## v1.0.2 · 2026-11-21
-- Fake player counts: when a server reports more players than its player list shows, cards show the real count with a ⚠️ note
+- Real player counts: when a server reports more players than its player list shows (fake players), cards show the real number
 - Cards show when the current map started, next to when they were last updated
 - More map pictures: simple, dark previews are no longer mistaken for blank ones
 - Runs on small free hosts: lighter database library, and the token can come from `DISCORD_TOKEN`
