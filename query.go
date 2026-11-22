@@ -19,7 +19,7 @@ type Status struct {
 	Name, Map          string
 	Players, Bots, Max int
 	AppID              int   // Steam game: 730 is Counter-Strike 2
-	Claimed            int   // players the server reported when its player list shows clearly fewer; 0 = honest
+	Reported           int   // players (without bots) the server reports; more than Humans() when it fakes its count
 	MapSince           int64 // unix time the current map started, as seen by Shiron; 0 = unknown
 }
 
@@ -29,15 +29,14 @@ const fakeSlack = 2
 
 // checkRealPlayers compares the reported player count with the server's player list.
 // Some servers inflate the count shown in server browsers (fake players) while the
-// list shows who is really there; then the list's count is used and Claimed keeps the
-// reported one. Honest CS2 servers list everyone (checked live: 13/13, 62/62).
+// list shows who is really there; then the list's count is used (Reported keeps the
+// claimed one). Honest CS2 servers list everyone (checked live: 13/13, 62/62).
 func checkRealPlayers(c *a2s.Client, st *Status) {
 	p, err := c.QueryPlayer()
 	if err != nil || p == nil {
 		return // no list to compare with: keep the reported count
 	}
 	if listed := max(len(p.Players)-st.Bots, 0); listed < st.Humans()-fakeSlack {
-		st.Claimed = st.Humans()
 		st.Players = listed + st.Bots
 	}
 }
@@ -103,6 +102,7 @@ func queryInfo(addr string) (*Status, error) {
 		return nil, err
 	}
 	st := &Status{Name: info.Name, Map: info.Map, Players: int(info.Players), Bots: int(info.Bots), Max: int(info.MaxPlayers), AppID: int(info.ID)}
+	st.Reported = st.Humans()
 	if st.Humans() > fakeSlack {
 		checkRealPlayers(c, st)
 	}
@@ -195,8 +195,8 @@ func runQueryCLI(addr string) error {
 		return fmt.Errorf("info query failed: %w", err)
 	}
 	fmt.Printf("Name:    %s\nMap:     %s\nPlayers: %d/%d (%d bots)\n", st.Name, st.Map, st.Humans(), st.Max, st.Bots)
-	if st.Claimed > 0 {
-		fmt.Printf("         the server reports %d, but its player list shows %d\n", st.Claimed, st.Humans())
+	if st.Reported > st.Humans() {
+		fmt.Printf("         the server reports %d, but its player list shows %d\n", st.Reported, st.Humans())
 	}
 	if cfg.MapImages = envOr("SHIRON_MAP_IMAGES", defaultMapImages); cfg.MapImages == "none" {
 		cfg.MapImages = ""

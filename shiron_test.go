@@ -776,7 +776,7 @@ func TestAlertListView(t *testing.T) {
 }
 
 func TestCommandSet(t *testing.T) {
-	want := []string{"about", "help", "invite", "map", "notify add", "notify list", "ping", "players", "servers add", "servers list"}
+	want := []string{"about", "help", "invite", "map", "notify add", "notify list", "ping", "players", "servers add", "servers list", "stat"}
 	var got []string
 	for _, c := range commandDefs() {
 		if len(c.Options) > 0 && c.Options[0].Type == discordgo.ApplicationCommandOptionSubCommand {
@@ -806,9 +806,9 @@ func TestCommandSet(t *testing.T) {
 }
 
 func TestChangelogAndAbout(t *testing.T) {
-	// The real CHANGELOG.md must parse, newest first, newest is v1.0.2.
+	// The real CHANGELOG.md must parse, newest first, newest is v1.1.
 	v := version()
-	if v.Version != "v1.0.2" || v.Date != "2026-11-21" || !strings.HasPrefix(v.Notes, "- ") {
+	if v.Version != "v1.1" || v.Date != "2026-11-22" || !strings.HasPrefix(v.Notes, "- ") {
 		t.Fatalf("version() = %+v", v)
 	}
 	rs := releases("# Changelog\nintro\n\n## v1.1 · 2026-12-01\n- new thing\n\n## v1.0 · 2026-11-19\n- first\n")
@@ -844,7 +844,7 @@ func TestChangelogAndAbout(t *testing.T) {
 			all.WriteString(v.Components[0].(discordgo.TextDisplay).Content + "\n")
 		}
 	}
-	for _, want := range []string{"## Shiron", "v1.0.2 · updated 2026-11-21", "What's new in v1.0.2", "**2** Discord servers", "**2** CS2 servers tracked", "online since <t:"} {
+	for _, want := range []string{"## Shiron", "v1.1 · updated 2026-11-22", "What's new in v1.1", "**2** Discord servers", "**2** CS2 servers tracked", "online since <t:"} {
 		if !strings.Contains(all.String(), want) {
 			t.Errorf("about card missing %q:\n%s", want, all.String())
 		}
@@ -853,7 +853,7 @@ func TestChangelogAndAbout(t *testing.T) {
 	if row[0].(discordgo.Button).Style != discordgo.LinkButton || row[1].(discordgo.Button).CustomID != "about:log" {
 		t.Errorf("about buttons = %+v", row)
 	}
-	if txt := changelogView("en-US")[0].(discordgo.TextDisplay).Content; !strings.Contains(txt, "**v1.0.2** · 2026-11-21") {
+	if txt := changelogView("en-US")[0].(discordgo.TextDisplay).Content; !strings.Contains(txt, "**v1.1** · 2026-11-22") {
 		t.Errorf("changelog = %q", txt)
 	}
 }

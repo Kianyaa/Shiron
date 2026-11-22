@@ -103,6 +103,43 @@ func pollOnce(s *discordgo.Session) {
 			}
 		}
 	}
+	recordSamples(byAddr, results, time.Now())
+}
+
+const (
+	sampleEvery = 5 * time.Minute     // one history point per server per 5 minutes
+	statKeep    = 30 * 24 * time.Hour // how long history is kept
+)
+
+var lastSampleSlot int64 // only the poller goroutine touches this
+
+// recordSamples saves each server's player count for /stat, once per sampleEvery. A
+// server that missed a reply but isn't offline yet gets no point (a gap), not "offline".
+// Old history is pruned once a day.
+func recordSamples(byAddr map[string][]Server, results map[string]*Status, now time.Time) {
+	step := int64(sampleEvery / time.Second)
+	slot := now.Unix() / step
+	if slot == lastSampleSlot {
+		return
+	}
+	first := lastSampleSlot == 0
+	lastSampleSlot = slot
+	for addr := range byAddr {
+		s := Sample{At: slot * step, Players: -1}
+		if st := results[addr]; st != nil {
+			s = Sample{At: slot * step, Players: st.Humans(), Reported: st.Reported, Max: st.Max, Map: st.Map}
+		} else if !serverHealth.down[addr] {
+			continue
+		}
+		if err := db.AddSample(addr, s); err != nil {
+			slog.Error("save player sample", "err", err)
+		}
+	}
+	if first || slot%int64(24*time.Hour/sampleEvery) == 0 {
+		if err := db.PruneSamples(now.Add(-statKeep).Unix()); err != nil {
+			slog.Error("prune player history", "err", err)
+		}
+	}
 }
 
 var lastPresence string // only the poller goroutine touches this

@@ -12,6 +12,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"sync"
@@ -48,6 +50,22 @@ func (r *recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Body != nil {
 		b, _ := io.ReadAll(req.Body)
 		json.Unmarshal(b, &body)
+		// Uploads are multipart: the JSON is the payload_json part; "_files" counts the rest.
+		if mt, params, _ := mime.ParseMediaType(req.Header.Get("Content-Type")); strings.HasPrefix(mt, "multipart/") {
+			files := 0
+			mr := multipart.NewReader(bytes.NewReader(b), params["boundary"])
+			for p, err := mr.NextPart(); err == nil; p, err = mr.NextPart() {
+				if p.FormName() == "payload_json" {
+					pb, _ := io.ReadAll(p)
+					json.Unmarshal(pb, &body)
+				} else {
+					files++
+				}
+			}
+			if body != nil {
+				body["_files"] = float64(files)
+			}
+		}
 	}
 	r.mu.Lock()
 	r.reqs = append(r.reqs, sent{req.Method, req.URL.Path, body})
@@ -723,17 +741,59 @@ func TestE2E(t *testing.T) {
 		}
 	})
 
+	t.Run("/stat: chart picture, range buttons, map dropdown, busy hours", func(t *testing.T) {
+		now := time.Now().Unix() / 300 * 300
+		var firstRun int64
+		for at := now - 3*3600; at < now; at += 300 {
+			m := "ze_first"
+			if at >= now-3600 {
+				m = live.Map
+			}
+			if firstRun == 0 {
+				firstRun = at
+			}
+			s.AddSample(e2eServer, Sample{At: at, Players: int(at/300%40) + 5, Reported: 50, Max: 64, Map: m})
+		}
+		reqs := run("/stat", click(t, 2, map[string]any{"id": "c", "name": "stat", "type": 1}, nil, false))
+		if len(reqs) != 1 || reqs[0].Body["type"].(float64) != 4 || reqs[0].Body["_files"] != float64(1) {
+			t.Fatalf("want one public reply with a picture, got %d requests: %+v", len(reqs), reqs[0].Body)
+		}
+		txt := allText(reqs[0].Body)
+		for _, want := range []string{"average", "[id:stat:7d:" + srvID + "]", "[id:stat:busy:" + srvID + "]", "[id:stat:map:" + srvID + ":24h]"} {
+			if !strings.Contains(txt, want) {
+				t.Errorf("/stat missing %q:\n%s", want, txt)
+			}
+		}
+		reqs = run("7d", click(t, 3, press("stat:7d:"+srvID), nil, false))
+		if reqs[0].Body["type"].(float64) != 7 || reqs[0].Body["_files"] != float64(1) || !strings.Contains(allText(reqs[0].Body), "last 7 days") {
+			t.Errorf("7 days should update the message with a new picture: %+v", reqs[0].Body)
+		}
+		pick := map[string]any{"custom_id": "stat:map:" + srvID + ":24h", "component_type": 3, "values": []any{fmt.Sprint(firstRun)}}
+		reqs = run("pick map", click(t, 3, pick, nil, false))
+		if txt := allText(reqs[0].Body); !strings.Contains(txt, "ze\\_first") || !strings.Contains(txt, "ran 2h") {
+			t.Errorf("picked map details missing:\n%s", txt)
+		}
+		reqs = run("busy", click(t, 3, press("stat:busy:"+srvID), nil, false))
+		if reqs[0].Body["_files"] != nil || !strings.Contains(allText(reqs[0].Body), "Best time to play") {
+			t.Errorf("busy hours: text only, with the best time: %+v", reqs[0].Body)
+		}
+		reqs = run("forged id", click(t, 3, press("stat:24h:999999"), nil, false))
+		if !strings.Contains(allText(reqs[0].Body), "❌") {
+			t.Errorf("a server from another Discord server must not show: %s", allText(reqs[0].Body))
+		}
+	})
+
 	t.Run("/about and its Full changelog button", func(t *testing.T) {
 		reqs := run("about", click(t, 2, map[string]any{"id": "c", "name": "about", "type": 1}, nil, false))
 		txt := allText(reqs[0].Body)
-		for _, want := range []string{"## ShironBot", "v1.0.2", "What's new in v1.0.2", "CS2 servers tracked", "[label:Invite Shiron]", "[id:about:log]"} {
+		for _, want := range []string{"## ShironBot", "v1.1", "What's new in v1.1", "CS2 servers tracked", "[label:Invite Shiron]", "[id:about:log]"} {
 			if !strings.Contains(txt, want) {
 				t.Errorf("/about missing %q:\n%s", want, txt)
 			}
 		}
 		reqs = run("changelog", click(t, 3, press("about:log"), nil, false))
-		if f, _ := reqs[0].Body["data"].(map[string]any)["flags"].(float64); int(f)&64 == 0 || !strings.Contains(allText(reqs[0].Body), "**v1.0.2**") {
-			t.Errorf("changelog should be private and list v1.0.2: %s", allText(reqs[0].Body))
+		if f, _ := reqs[0].Body["data"].(map[string]any)["flags"].(float64); int(f)&64 == 0 || !strings.Contains(allText(reqs[0].Body), "**v1.1**") {
+			t.Errorf("changelog should be private and list v1.1: %s", allText(reqs[0].Body))
 		}
 	})
 

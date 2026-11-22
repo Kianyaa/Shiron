@@ -4,6 +4,12 @@ Shiron shows the newest entry in `/about` and the last few under **Full changelo
 Add each new version above the others: a level-2 heading with the version, a middle dot and
 the date (like the one below), then one bullet line per change.
 
+## v1.1 · 2026-11-22
+- New `/stat`: a chart of real player counts over 24 hours, 7 or 30 days, with average players, time full, busiest hour and maps played
+- Pick a map in `/stat` to see when it started, how long it ran and how many played
+- Busy hours: a weekly grid of when each server is full, with the best time to play
+- Shiron now keeps 30 days of player counts per server (never player names)
+
 ## v1.0.2 · 2026-11-21
 - Real player counts: when a server reports more players than its player list shows (fake players), cards show the real number
 - Cards show when the current map started, next to when they were last updated

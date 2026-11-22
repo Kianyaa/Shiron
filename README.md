@@ -24,6 +24,7 @@ Live map cards, map-change alerts and map pictures. One program file, no databas
 
 - 🗺️ **Map-change posts** in a channel, with a picture of the map and an optional minimum player count.
 - 📊 **`/map` and `/players`** show live server info, with a **Join server** button that opens CS2 and connects.
+- 📈 **`/stat`** charts real player counts over 24 hours, 7 or 30 days, lists the maps played, and shows the busiest hours of the week.
 - 🔔 **Alerts** by DM or a channel mention when a map you want comes up. Wildcards like `ze_*` work, for one server or all of them.
 - 🟢 **Offline / back-online posts** that say when a server was last seen and how long it was down.
 - 🖼️ **Map pictures** from Steam Workshop, community packs or your own Workshop collections.
@@ -39,7 +40,7 @@ Live map cards, map-change alerts and map pictures. One program file, no databas
 |---|---|
 | `/servers add ip [channel] [min_players] [style]` | Manage Server |
 | `/servers list` — manage servers (channel, card style, min players, remove), map pictures and Workshop collections | Manage Server |
-| `/map [server]`, `/players [server]` | everyone |
+| `/map [server]`, `/players [server]`, `/stat [server]` | everyone |
 | `/notify add map [server]` — leave out `server` to be alerted on all servers | everyone |
 | `/notify list` — see and remove your alerts, switch DM / channel | everyone |
 | `/about` — version, what's new and stats | everyone |

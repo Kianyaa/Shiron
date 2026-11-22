@@ -40,7 +40,7 @@ func TestCardTimes(t *testing.T) {
 		t.Fatalf("unknown start: %q", got)
 	}
 	// A server faking 16 players while listing 1: the card shows 1, with no warning.
-	st := &Status{Map: "ze_x", Players: 1, Max: 65, Claimed: 16, MapSince: 1700000000}
+	st := &Status{Map: "ze_x", Players: 1, Max: 65, Reported: 16, MapSince: 1700000000}
 	card := fullCard("en-US", Server{Address: "1.2.3.4:27015"}, st, "")
 	text := ""
 	for _, c := range card.Components {

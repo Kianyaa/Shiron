@@ -80,6 +80,7 @@ func commandDefs() []*discordgo.ApplicationCommand {
 		servers,
 		command("map", "cmd.map", server(false)),
 		command("players", "cmd.players", server(false)),
+		command("stat", "cmd.stat", server(false)),
 		command("notify", "cmd.notify",
 			option(sub, "add", "cmd.notify.add", false, mapName, server(false)),
 			option(sub, "list", "cmd.notify.list", false),
@@ -217,7 +218,7 @@ func defaultServer(list []Server, channelID string) *Server {
 var handlers = map[string]func(*ictx){
 	"ping": cmdPing, "help": cmdHelp, "invite": cmdInvite, "about": cmdAbout,
 	"servers add": cmdServersAdd, "servers list": cmdServersList,
-	"map": cmdMap, "players": cmdPlayers,
+	"map": cmdMap, "players": cmdPlayers, "stat": cmdStat,
 	"notify add": cmdNotifyAdd, "notify list": cmdNotifyList,
 }
 
@@ -252,6 +253,8 @@ func onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			onManage(s, i)
 		case strings.HasPrefix(id, "ntf:"):
 			onAlertList(s, i)
+		case strings.HasPrefix(id, "stat:"):
+			onStat(s, i)
 		case strings.HasPrefix(id, "about:"):
 			onAbout(s, i)
 		default:

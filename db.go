@@ -78,7 +78,56 @@ CREATE TABLE IF NOT EXISTS map_starts (
 	map TEXT NOT NULL,
 	since INTEGER NOT NULL,
 	known INTEGER NOT NULL
-);`
+);
+-- Player history for /stat: one row per game server every 5 minutes, kept 30 days.
+-- players is the real count (fake players removed); -1 means the server was offline.
+CREATE TABLE IF NOT EXISTS player_samples (
+	address TEXT NOT NULL,
+	at INTEGER NOT NULL,
+	players INTEGER NOT NULL,
+	reported INTEGER NOT NULL,
+	max INTEGER NOT NULL,
+	map TEXT NOT NULL,
+	PRIMARY KEY (address, at)
+) WITHOUT ROWID;`
+
+// Sample is one point of a server's player history.
+type Sample struct {
+	At                     int64
+	Players, Reported, Max int // Players -1 = offline
+	Map                    string
+}
+
+func (db *Store) AddSample(addr string, s Sample) error {
+	_, err := db.Exec("INSERT OR REPLACE INTO player_samples (address, at, players, reported, max, map) VALUES (?,?,?,?,?,?)",
+		addr, s.At, s.Players, s.Reported, s.Max, s.Map)
+	return err
+}
+
+// Samples returns a server's history from a unix time on, oldest first.
+func (db *Store) Samples(addr string, from int64) ([]Sample, error) {
+	rows, err := db.Query("SELECT at, players, reported, max, map FROM player_samples WHERE address = ? AND at >= ? ORDER BY at", addr, from)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Sample
+	for rows.Next() {
+		var s Sample
+		if err := rows.Scan(&s.At, &s.Players, &s.Reported, &s.Max, &s.Map); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// PruneSamples drops history older than before, and history of game servers that no
+// Discord server tracks anymore.
+func (db *Store) PruneSamples(before int64) error {
+	_, err := db.Exec("DELETE FROM player_samples WHERE at < ? OR address NOT IN (SELECT address FROM servers)", before)
+	return err
+}
 
 // MapStart returns what Shiron last recorded about a server's map; ok is false when
 // it has no record.
